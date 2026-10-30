@@ -1,238 +1,59 @@
 # AstraOS
 
-A hobby x86_64 operating system written in C from scratch.
+AstraOS is an experimental x86_64 operating system written primarily in C. The goal is a small, independent **usable personal OS**: boot, run isolated applications, create and keep files, connect to a network, and eventually use a restartable desktop on documented UEFI machines.
 
-**Project direction:** AstraOS is growing toward a small, usable independent
-operating system: isolated user programs, reliable files, a userspace shell and
-applications, and documented real-hardware support. See
-[the product contract](.agent-state/product-spec.md) for the current milestones.
-The kernel is still experimental; the supported boot and user-program paths
-are checked in QEMU, while physical hardware and persistent-data reliability
-remain to be validated.
+The [vision](docs/vision.md), [system architecture](docs/architecture.md), [researched technology decisions](docs/decisions.md), and [feature roadmap](docs/roadmap.md) describe the full direction in focused documents. The [design index](docs/README.md) links the parts. The first active slice is the [persistent text workflow](docs/features/persistent-text.md).
 
-![Architecture](https://img.shields.io/badge/arch-x86__64-blue)
-![Language](https://img.shields.io/badge/lang-C-orange)
-![Bootloader](https://img.shields.io/badge/boot-Limine-purple)
-![License](https://img.shields.io/badge/license-MIT-green)
+## What works today
 
----
+- Limine boot into an x86_64 kernel with serial/framebuffer console and a kernel recovery shell.
+- Physical and virtual memory management, ring 3 ELF programs, syscalls, process scheduling and fault isolation.
+- Timer preemption of user programs, background launch/kill, exit/reap, and a basic userspace shell.
+- VFS and FAT16 file-operation primitives; storage persistence and power-loss safety are **not yet verified** as user workflows.
+- Device-driver code including ATA, AHCI, NVMe, USB and RTL8139. Presence of a driver does not imply tested hardware support or a working TCP/IP stack.
 
-## Features
+QEMU integration checks currently cover boot, user fault recovery, preemption, and process-slot reuse. The default interactive shell is still kernel-owned. No supported physical-machine release, userspace desktop, or application-level networking is claimed yet.
 
-### Core Kernel
-- **Limine bootloader** - UEFI/BIOS support, handles long mode setup
-- **Higher-half kernel** - Loaded at `0xFFFFFFFF80000000`
-- **GDT with TSS** - Kernel/user segments, task state segment
-- **IDT** - Full exception handling (0-31) and IRQ support (32-47)
-- **8259 PIC** - Remapped IRQs, abstracted for future APIC support
+## Build and run
 
-### Memory Management
-- **Physical Memory Manager** - Bitmap allocator, 4KB pages
-- **Virtual Memory Manager** - 4-level paging (PML4)
-- **Kernel Heap** - `kmalloc()`/`kfree()` with block coalescing
+On Linux or WSL, install GCC, binutils, NASM, xorriso, dosfstools, mtools, Python 3, QEMU, and Git. The Makefile fetches a Limine `v8.x-binary` checkout into `limine/` when needed.
 
-### Process Management
-- **Process Control Blocks** - PID, state, kernel stack
-- **Round-Robin Scheduler** - Timer preemption for user-mode code; kernel-mode
-  work is scheduled at safe points
-- **Context Switching** - Full register save/restore
-- **Ring 3 User Mode** - Isolated user address spaces and syscall entry
-- **ELF64 Loader** - Loads user-space ELF executables from VFS
-
-### Drivers
-- **Framebuffer Console** - Text output with 8x8 font
-- **PS/2 Keyboard** - Scancode translation, modifier keys
-- **PIT Timer** - 1000 Hz tick, lightweight IRQ handler
-- **Serial Port** - COM1 debug output at 115200 baud
-- **ATA Disk** - PIO mode read-only driver
-- **ACPI** - Power off support
-
-### File System
-- **VFS Layer** - Abstract file operations
-- **FAT16** - Read/write support under development; interrupted-write recovery
-  is not yet proven
-
-### Shell
-Built-in commands:
-| Command | Description |
-|---------|-------------|
-| `help` | List available commands |
-| `clear` | Clear the screen |
-| `echo` | Print text |
-| `mem` | Show memory usage |
-| `uptime` | Display system uptime |
-| `cpuinfo` | Show CPU information |
-| `ls` | List directory contents |
-| `cat` | Display file contents |
-| `run` | Run ELF64 or flat user binary |
-| `ps` | List processes |
-| `version` | Show OS version |
-| `test` | Run system tests |
-| `reboot` | Restart system |
-| `shutdown` | Power off (ACPI) |
-
----
-
-## Project Structure
-
-```
-os/
-├── Makefile
-├── linker.ld
-├── limine.conf
-└── kernel/
-    ├── main.c              # Entry point
-    ├── panic.c/h           # Kernel panic
-    ├── limine.h            # Bootloader protocol
-    ├── arch/x86_64/
-    │   ├── gdt.c/h/asm     # Global Descriptor Table
-    │   ├── idt.c/h/asm     # Interrupt Descriptor Table
-    │   ├── isr.c/h         # Interrupt handlers
-    │   ├── pic.c/h         # 8259 PIC driver
-    │   ├── irq.c/h         # IRQ abstraction
-    │   ├── cpu.h           # CPU operations
-    │   └── io.h            # Port I/O
-    ├── sync/
-    │   └── spinlock.c/h    # Spinlock primitives
-    ├── mm/
-    │   ├── pmm.c/h         # Physical memory
-    │   ├── vmm.c/h         # Virtual memory
-    │   └── heap.c/h        # Kernel heap
-    ├── proc/
-    │   ├── process.c/h     # Process management
-    │   ├── scheduler.c/h   # Scheduler
-    │   └── context.asm     # Context switch
-    ├── drivers/
-    │   ├── serial.c/h      # Serial port
-    │   ├── pit.c/h         # Timer
-    │   ├── keyboard.c/h    # Keyboard
-    │   ├── ata.c/h         # Disk driver
-    │   └── acpi.c/h        # ACPI power management
-    ├── fs/
-    │   ├── vfs.c/h         # Virtual filesystem
-    │   └── fat.c/h         # FAT16 driver
-    ├── lib/
-    │   ├── string.c/h      # String functions
-    │   └── stdio.c/h       # kprintf
-    └── shell/
-        ├── shell.c/h       # Command interpreter
-        └── commands.c/h    # Built-in commands
-```
-
----
-
-## Building
-
-### Requirements
-- GCC (or x86_64-elf-gcc cross compiler)
-- NASM
-- xorriso
-- dosfstools
-- mtools
-- QEMU
-- Git
-- Python 3 (for the user-fault integration test)
-
-### On Linux/WSL
-
-```bash
-# Install dependencies (Ubuntu/Debian)
-sudo apt install build-essential nasm xorriso qemu-system-x86 git dosfstools mtools
-
-# Clone Limine bootloader
-git clone https://github.com/limine-bootloader/limine.git --branch=v8.x-binary --depth=1
-
-# Build boot ISO and user programs
+```sh
 make iso
 make disk
-
-# Run with the FAT16 user-program disk attached
 make run
 ```
 
-### Make Targets
-| Target | Description |
-|--------|-------------|
-| `make` | Build kernel |
-| `make userspace` | Build user-space ELF binaries |
-| `make iso` | Create bootable ISO |
-| `make disk` | Create FAT16 disk image containing user programs |
-| `make run` | Run in QEMU |
-| `make run-debug` | Run with interrupt debugging |
-| `make smoke` | Clean build and check boot reaches kernel initialization |
-| `make fault-smoke` | Boot, isolate a faulty userspace program, then run another |
-| `make preemption-smoke` | Check two busy user programs, shell responsiveness, and process reuse |
-| `make clean` | Remove build artifacts |
+`make disk` creates a new 32 MiB FAT16 image with sample programs. **It replaces `disk.img`**, so keep a copy or skip that target when preserving data. `make run` depends on `disk` and therefore also recreates the disk image; use the direct QEMU invocation below to reopen an existing image:
 
----
-
-## Running in QEMU
-
-```bash
-# Run with FAT16 disk image containing /SH and /HELLO
-qemu-system-x86_64 -cdrom astraos.iso -m 256M -serial stdio \
-    -drive file=disk.img,format=raw,if=ide
-
-# Debug mode
-qemu-system-x86_64 -cdrom astraos.iso -m 256M -serial stdio \
-    -d int -no-reboot -no-shutdown
+```sh
+qemu-system-x86_64 -cdrom astraos.iso -boot order=d \
+  -drive file=disk.img,format=raw,if=ide -m 256M -serial stdio
 ```
 
----
+At the kernel shell, try `help`, `ls /`, `run /HELLO`, or `run /SH` to enter the userspace shell. User-program and shell capabilities are evolving; see the focused feature document for the current save workflow.
 
-## Creating a Test Disk
+## Checks
 
-```bash
-make disk
-make run
+```sh
+make smoke
+make fault-smoke
+make preemption-smoke
 ```
 
-Inside AstraOS:
+These checks use QEMU. They do not establish crash-safe file writes or real-hardware support. The [feature tracker](.agent-state/feature-list.json) records acceptance evidence.
 
-```text
-ls /
-run /HELLO
-run /SH
-cat /HELLO
-run /HELLO
-```
+## Repository layout
 
----
-
-## Design Principles
-
-1. **Lightweight ISRs** - Interrupt handlers only acknowledge hardware and queue work
-2. **Spinlock Protection** - All shared data structures protected
-3. **Timer Safety** - Timer ISR only sets flags, no heavy logic
-4. **Architecture Separation** - All x86 code in `arch/x86_64/`
-5. **Storage integrity** - FAT16 write and repair paths need further
-   power-loss and corruption testing before files are considered durable
-
----
-
-## Future Plans
-
-- [x] User mode (Ring 3)
-- [x] System calls
-- [x] ELF program loader
-- [ ] Move primary shell fully to user space
-- [x] Basic file syscalls
-- [x] Process spawning from user space
-- [ ] APIC/IOAPIC support
-- [ ] SMP (multi-core)
-- [ ] Network stack
-- [ ] GUI subsystem
-
----
-
-## Resources
-
-- [OSDev Wiki](https://wiki.osdev.org/)
-- [Limine Protocol](https://github.com/limine-bootloader/limine/blob/trunk/PROTOCOL.md)
-- [Intel SDM](https://www.intel.com/content/www/us/en/developer/articles/technical/intel-sdm.html)
-
----
+| Path | Purpose |
+| --- | --- |
+| `kernel/arch/x86_64/`, `kernel/mm/`, `kernel/proc/` | CPU boundary, memory, and processes |
+| `kernel/fs/`, `kernel/drivers/`, `kernel/shell/` | Storage, hardware, and recovery shell |
+| `userspace/` | Native ELF programs and syscall wrapper |
+| `scripts/` | QEMU integration checks |
+| `docs/` | Vision, architecture, decisions, roadmap and feature contracts |
+| `.agent-state/` | Current product contract, progress, and machine-readable feature evidence |
 
 ## License
 
-MIT License - Free to use, modify, and learn from.
+MIT. Check the repository license terms before redistribution.
