@@ -76,6 +76,36 @@ static int write_all(int fd, const char *data, size_t length) {
     return 0;
 }
 
+/* A failed metadata syscall may still have changed the directory entry. */
+static int file_matches(const char *path, const char *data, size_t length) {
+    long fd = sys_open(path);
+    if (fd < 0) return 0;
+
+    char buffer[128];
+    size_t offset = 0;
+    int matches = 1;
+    while (offset < length) {
+        size_t chunk = length - offset;
+        if (chunk > sizeof(buffer)) chunk = sizeof(buffer);
+        long count = sys_read((int)fd, buffer, chunk);
+        if (count <= 0) {
+            matches = 0;
+            break;
+        }
+        for (long i = 0; i < count; i++) {
+            if (buffer[i] != data[offset + (size_t)i]) matches = 0;
+        }
+        if (!matches) break;
+        offset += (size_t)count;
+    }
+    if (matches) {
+        char extra;
+        matches = sys_read((int)fd, &extra, 1) == 0;
+    }
+    if (sys_close((int)fd) < 0) matches = 0;
+    return matches;
+}
+
 int user_replace_file(const char *path, const char *data, size_t length,
                       char recovery_path[16]) {
     if (recovery_path) recovery_path[0] = '\0';
@@ -107,18 +137,32 @@ int user_replace_file(const char *path, const char *data, size_t length,
 
     int had_original = file_exists(path);
     if (had_original && sys_rename(path, backup) < 0) {
-        sys_unlink(temporary);
-        return USER_REPLACE_BACKUP_FAILED;
+        if (file_exists(path) || !file_exists(backup)) {
+            sys_unlink(temporary);
+            return USER_REPLACE_BACKUP_FAILED;
+        }
     }
     if (sys_rename(temporary, path) < 0) {
+        if (file_matches(path, data, length)) {
+            /* The rename reached disk even though its completion reported error. */
+            if (had_original && sys_unlink(backup) < 0 && file_exists(backup)) {
+                if (recovery_path) copy_path(recovery_path, backup);
+                return USER_REPLACE_BACKUP_LEFT;
+            }
+            return USER_REPLACE_OK;
+        }
         if (had_original && sys_rename(backup, path) < 0) {
+            if (file_exists(path) && !file_exists(backup)) {
+                sys_unlink(temporary);
+                return USER_REPLACE_PROMOTE_FAILED;
+            }
             if (recovery_path) copy_path(recovery_path, backup);
             return USER_REPLACE_RESTORE_FAILED;
         }
         sys_unlink(temporary);
         return USER_REPLACE_PROMOTE_FAILED;
     }
-    if (had_original && sys_unlink(backup) < 0) {
+    if (had_original && sys_unlink(backup) < 0 && file_exists(backup)) {
         if (recovery_path) copy_path(recovery_path, backup);
         return USER_REPLACE_BACKUP_LEFT;
     }

@@ -12,4 +12,4 @@ Poll for at most two seconds using the PIT that is initialized before ATA. Keep 
 
 ## Verification and remaining risk
 
-Three consecutive local editor save/reboot runs passed after the change. CI and real-hardware behavior still require separate evidence. Even with correct polling, a failed write can have taken effect before the error is returned; higher layers must inspect postconditions and retain recovery copies. This does not establish power-loss durability.
+Three consecutive local editor save/reboot runs passed after the driver change, and both CI runs for that commit passed. The userspace file-replacement flow now checks directory entries and file contents after a rename reports failure, and checks whether a backup remains after unlink reports failure. Local editor save/reboot and full-disk failure tests passed with that follow-up. Real-hardware behavior still requires separate evidence. Even with correct polling, a failed write can have taken effect before the error is returned; higher layers must inspect postconditions and retain recovery copies. This does not establish power-loss durability.
