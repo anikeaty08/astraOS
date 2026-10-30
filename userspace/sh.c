@@ -169,6 +169,51 @@ static void cat_file(const char *path) {
     puts("\n");
 }
 
+static void write_file(char *arg) {
+    char *path = arg;
+    while (*arg && *arg != ' ') arg++;
+    if (*arg != ' ' || arg == path || arg[1] == '\0') {
+        puts("usage: write <path> <text>\n");
+        return;
+    }
+
+    *arg++ = '\0';
+    long fd = sys_create(path);
+    if (fd < 0) {
+        if (sys_truncate(path, 0) < 0) {
+            puts("write: cannot create or truncate file\n");
+            return;
+        }
+        fd = sys_open_write(path);
+        if (fd < 0) {
+            puts("write: cannot open file\n");
+            return;
+        }
+    }
+
+    size_t length = strlen(arg);
+    size_t offset = 0;
+    while (offset < length) {
+        long n = sys_write((int)fd, arg + offset, length - offset);
+        if (n <= 0) {
+            puts("write: save failed\n");
+            sys_close((int)fd);
+            return;
+        }
+        offset += (size_t)n;
+    }
+    if (sys_write((int)fd, "\n", 1) != 1) {
+        puts("write: save failed\n");
+        sys_close((int)fd);
+        return;
+    }
+    if (sys_close((int)fd) < 0) {
+        puts("write: close failed\n");
+        return;
+    }
+    puts("saved\n");
+}
+
 static void run_program(const char *path) {
     long pid = sys_spawn(path);
 
@@ -216,7 +261,7 @@ int main(void) {
         trim_newline(line);
 
         if (strcmp(line, "help") == 0) {
-            puts("commands: help pid echo cat run kill wait exit yield\n");
+            puts("commands: help pid echo cat write run kill wait exit yield\n");
         } else if (strcmp(line, "pid") == 0) {
             print_pid();
         } else if (strcmp(line, "yield") == 0) {
@@ -225,6 +270,8 @@ int main(void) {
             puts("echo from ring 3\n");
         } else if (starts_with(line, "cat ")) {
             cat_file(line + 4);
+        } else if (starts_with(line, "write ")) {
+            write_file(line + 6);
         } else if (starts_with(line, "run ")) {
             run_program(line + 4);
         } else if (starts_with(line, "kill ")) {

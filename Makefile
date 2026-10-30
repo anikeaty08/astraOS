@@ -55,7 +55,7 @@ USER_BINS := $(addprefix $(USER_BUILD)/,$(USER_PROGRAMS))
 # Limine bootloader path (adjust after cloning)
 LIMINE_DIR := limine
 
-.PHONY: all clean run run-debug run-gdb iso limine disk userspace smoke fault-smoke preemption-smoke
+.PHONY: all clean run run-debug run-gdb iso limine disk userspace smoke fault-smoke preemption-smoke persistence-smoke
 
 all: $(KERNEL) userspace
 
@@ -170,6 +170,9 @@ fault-smoke: iso disk
 preemption-smoke: iso disk
 	python3 ./scripts/preemption-smoke.py
 
+persistence-smoke: iso disk
+	python3 ./scripts/persistence-smoke.py
+
 # Clean build artifacts
 clean:
 	rm -f $(OBJECTS) $(KERNEL) $(ISO) $(DISK)
@@ -196,6 +199,7 @@ help:
 	@echo "  smoke      - Build and run headless QEMU smoke test"
 	@echo "  fault-smoke - Verify user faults leave the shell and other apps usable"
 	@echo "  preemption-smoke - Verify busy apps can be killed and process slots reused"
+	@echo "  persistence-smoke - Verify userspace saves survive a guest reboot"
 	@echo "  clean      - Remove build artifacts"
 	@echo "  distclean  - Remove everything including Limine"
 	@echo "  help       - Show this help"

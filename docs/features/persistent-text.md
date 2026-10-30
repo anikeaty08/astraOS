@@ -12,9 +12,9 @@ The command should reject empty paths/text and a path it cannot create or open f
 
 ## Data flow and invariants
 
-Input line → userspace parser → bounded path and text → `SYS_CREATE` (new) or writable `SYS_OPEN` (existing) → `SYS_TRUNCATE` (existing) → `SYS_WRITE` until complete → `SYS_CLOSE` → optional `cat` readback → QEMU exit → second QEMU boot with the same disk image → `cat` and byte comparison. The test must not run `make disk` between boots because that would recreate the image. The first step proves normal-reboot persistence only.
+Input line → userspace parser → bounded path and text → `SYS_CREATE` (new) or `SYS_TRUNCATE` then writable `SYS_OPEN` (existing) → `SYS_WRITE` until complete → `SYS_CLOSE` → optional `cat` readback → QEMU exit → second QEMU boot with the same disk image → `cat` and byte comparison. Truncate happens before open because the current FAT16 driver creates separate in-memory nodes for path lookup and file descriptors; opening first leaves a stale size on the descriptor node. A future VFS node-coherency or fd-based truncate contract should remove this ordering dependency. The test must not run `make disk` between boots because that would recreate the image. The first step proves normal-reboot persistence only.
 
-The test uses a unique root-level 8.3 filename, checks both the initial and replaced content, and verifies the second boot. It must detect obvious save errors. Invalid names and short writes are separate focused cases. The current FAT16 write path has no documented atomic replacement or flush guarantee; power interruption may damage data and is outside this first gate.
+The test uses a root-level 8.3 filename, checks save responses, checks the replaced content after the second boot, and compares the exact on-disk bytes from the host. Invalid names and short writes are separate focused cases. The current FAT16 write path has no documented atomic replacement or flush guarantee; power interruption may damage data and is outside this first gate.
 
 ## Follow-up after acceptance
 

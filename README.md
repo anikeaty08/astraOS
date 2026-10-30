@@ -9,7 +9,7 @@ The [vision](docs/vision.md), [system architecture](docs/architecture.md), [rese
 - Limine boot into an x86_64 kernel with serial/framebuffer console and a kernel recovery shell.
 - Physical and virtual memory management, ring 3 ELF programs, syscalls, process scheduling and fault isolation.
 - Timer preemption of user programs, background launch/kill, exit/reap, and a basic userspace shell.
-- VFS and FAT16 file-operation primitives; storage persistence and power-loss safety are **not yet verified** as user workflows.
+- VFS and FAT16 file operations. A userspace single-line save/replacement survives a normal QEMU guest reboot; power-loss safety is **not verified**.
 - Device-driver code including ATA, AHCI, NVMe, USB and RTL8139. Presence of a driver does not imply tested hardware support or a working TCP/IP stack.
 
 QEMU integration checks currently cover boot, user fault recovery, preemption, and process-slot reuse. The default interactive shell is still kernel-owned. No supported physical-machine release, userspace desktop, or application-level networking is claimed yet.
@@ -39,9 +39,10 @@ At the kernel shell, try `help`, `ls /`, `run /HELLO`, or `run /SH` to enter the
 make smoke
 make fault-smoke
 make preemption-smoke
+make persistence-smoke
 ```
 
-These checks use QEMU. They do not establish crash-safe file writes or real-hardware support. The [feature tracker](.agent-state/feature-list.json) records acceptance evidence.
+These checks use QEMU. The persistence check recreates `disk.img` once, then reboots without recreating it and checks exact bytes. The checks do not establish crash-safe file writes or real-hardware support. The [feature tracker](.agent-state/feature-list.json) records acceptance evidence.
 
 ## Repository layout
 

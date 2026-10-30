@@ -10,7 +10,8 @@ Status words mean: **verified** has a passing repository/QEMU check; **present**
 
 ## Present but unproven as complete workflows
 
-- FAT16/VFS create, read, write, truncate, unlink and rename primitives; no user-edit/reboot acceptance test yet.
+- FAT16/VFS create, read, write, truncate, unlink and rename primitives; interrupted-write behavior is not yet proven.
+- A userspace single-line `write` command and `make persistence-smoke` now prove create, replace, and exact readback after a normal QEMU guest reboot. This is narrower than an editor or crash-safe storage.
 - Basic userspace shell and `/PKG`; userspace shell is not the default session and has no text editing command.
 - Framebuffer GUI, input, PCI, disk, USB and raw NIC drivers; named physical-machine support and a full userspace desktop/network service are not proven.
 

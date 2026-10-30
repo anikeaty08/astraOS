@@ -21,12 +21,15 @@
 #define USER_STACK_TOP      0x0000000080000000ULL
 #define USER_SPACE_TOP      0x0000800000000000ULL
 #define PROCESS_MAX_FILES   16
+#define PROCESS_FD_READ     1
+#define PROCESS_FD_WRITE    2
 
 struct vfs_node;
 
 struct process_file {
     struct vfs_node *node;
     uint64_t offset;
+    uint8_t access;
     bool used;
 };
 
@@ -149,7 +152,7 @@ void process_unblock(struct process *proc);
 uint64_t process_count(void);
 
 /* Process file descriptor helpers */
-int process_fd_open(struct process *proc, struct vfs_node *node);
+int process_fd_open(struct process *proc, struct vfs_node *node, uint8_t access);
 int process_fd_read(struct process *proc, int fd, uint8_t *buffer, size_t size);
 int process_fd_write(struct process *proc, int fd, const uint8_t *buffer, size_t size);
 int process_fd_close(struct process *proc, int fd);

@@ -122,23 +122,27 @@ static int copy_user_string(uint64_t user_ptr, char *out, size_t out_size) {
     return -1;
 }
 
-static int64_t sys_open(const char *path) {
+static int64_t sys_open(const char *path, uint64_t mode) {
     char kernel_path[USER_PATH_MAX];
+
+    if (mode > 1) return -1;
 
     if (copy_user_string((uint64_t)path, kernel_path, sizeof(kernel_path)) < 0) {
         return -1;
     }
 
-    struct vfs_node *node = vfs_open(kernel_path);
+    struct vfs_node *node = mode == 0 ? vfs_open(kernel_path) : vfs_resolve_path(kernel_path);
     struct process *current = process_current();
     if (!node || vfs_is_directory(node) ||
-        !vfs_can_read_as(node, current ? current->uid : 0,
-                         current ? current->is_admin : true)) {
+        (mode == 0 ? !vfs_can_read_as(node, current ? current->uid : 0,
+                                     current ? current->is_admin : true)
+                   : !vfs_can_write_as(node, current ? current->uid : 0,
+                                      current ? current->is_admin : true))) {
         if (node) vfs_close(node);
         return -1;
     }
 
-    int fd = process_fd_open(current, node);
+    int fd = process_fd_open(current, node, mode == 0 ? PROCESS_FD_READ : PROCESS_FD_WRITE);
     if (fd < 0) {
         vfs_close(node);
         return -1;
@@ -171,7 +175,7 @@ static int64_t sys_create(const char *path) {
         return -1;
     }
 
-    int fd = process_fd_open(current, node);
+    int fd = process_fd_open(current, node, PROCESS_FD_WRITE);
     if (fd < 0) {
         vfs_close(node);
         return -1;
@@ -356,7 +360,7 @@ void syscall_handler(struct interrupt_frame *frame) {
             break;
 
         case SYS_OPEN:
-            result = sys_open((const char *)frame->rdi);
+            result = sys_open((const char *)frame->rdi, frame->rsi);
             break;
 
         case SYS_CLOSE:

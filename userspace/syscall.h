@@ -39,6 +39,10 @@ static inline long sys_open(const char *path) {
     return syscall3(SYS_OPEN, (long)path, 0, 0);
 }
 
+static inline long sys_open_write(const char *path) {
+    return syscall3(SYS_OPEN, (long)path, 1, 0);
+}
+
 static inline long sys_close(int fd) {
     return syscall3(SYS_CLOSE, fd, 0, 0);
 }

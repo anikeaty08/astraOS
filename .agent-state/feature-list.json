@@ -72,6 +72,21 @@
       "evidence": []
     },
     {
+      "id": "normal-reboot-text-persistence",
+      "description": "A userspace command can create or replace a text file and reopen the exact bytes after a normal guest reboot.",
+      "priority": 2,
+      "dependencies": ["process-lifecycle"],
+      "acceptance_steps": [
+        "Create and replace a text file through the userspace shell",
+        "Reboot the guest without recreating its disk image",
+        "Read the replaced contents and compare exact on-disk bytes"
+      ],
+      "status": "passing",
+      "evidence": [
+        "2026-10-30: make persistence-smoke saved and replaced /PERSIST.TXT from /SH, issued a guest reboot, launched a second QEMU guest on the same disk image, and read final version. Host mtype inspection showed exact bytes final version plus newline."
+      ]
+    },
+    {
       "id": "persistent-files",
       "description": "A user can edit a file, reboot, and reopen the same contents.",
       "priority": 2,

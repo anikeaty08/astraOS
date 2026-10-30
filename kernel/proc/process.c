@@ -730,13 +730,14 @@ uint64_t process_count(void) {
     return count;
 }
 
-int process_fd_open(struct process *proc, struct vfs_node *node) {
-    if (!proc || !node) return -1;
+int process_fd_open(struct process *proc, struct vfs_node *node, uint8_t access) {
+    if (!proc || !node || (access != PROCESS_FD_READ && access != PROCESS_FD_WRITE)) return -1;
 
     for (int fd = 3; fd < PROCESS_MAX_FILES; fd++) {
         if (!proc->files[fd].used) {
             proc->files[fd].node = node;
             proc->files[fd].offset = 0;
+            proc->files[fd].access = access;
             proc->files[fd].used = true;
             return fd;
         }
@@ -750,6 +751,7 @@ int process_fd_read(struct process *proc, int fd, uint8_t *buffer, size_t size) 
     if (!proc || !buffer) return -1;
     if (fd < 3 || fd >= PROCESS_MAX_FILES) return -1;
     if (!proc->files[fd].used || !proc->files[fd].node) return -1;
+    if (!(proc->files[fd].access & PROCESS_FD_READ)) return -1;
     if (!vfs_can_read_as(proc->files[fd].node, proc->uid, proc->is_admin)) return -1;
 
     int bytes = vfs_read(proc->files[fd].node, proc->files[fd].offset, size, buffer);
@@ -765,6 +767,7 @@ int process_fd_write(struct process *proc, int fd, const uint8_t *buffer, size_t
     if (!proc || !buffer) return -1;
     if (fd < 3 || fd >= PROCESS_MAX_FILES) return -1;
     if (!proc->files[fd].used || !proc->files[fd].node) return -1;
+    if (!(proc->files[fd].access & PROCESS_FD_WRITE)) return -1;
     if (!vfs_can_write_as(proc->files[fd].node, proc->uid, proc->is_admin)) return -1;
 
     int bytes = vfs_write(proc->files[fd].node, proc->files[fd].offset, size, buffer);
@@ -786,6 +789,7 @@ int process_fd_close(struct process *proc, int fd) {
 
     proc->files[fd].node = NULL;
     proc->files[fd].offset = 0;
+    proc->files[fd].access = 0;
     proc->files[fd].used = false;
     return 0;
 }
