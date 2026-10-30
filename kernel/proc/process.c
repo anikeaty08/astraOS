@@ -11,6 +11,8 @@
 #include "../lib/string.h"
 #include "../sync/spinlock.h"
 #include "../fs/vfs.h"
+#include "../panic.h"
+#include "../arch/x86_64/cpu.h"
 
 /*
  * Process table
@@ -18,6 +20,7 @@
 static struct process process_table[MAX_PROCESSES];
 static uint64_t next_pid = 1;
 static struct process *current_process = NULL;
+static struct process *foreground_process = NULL;
 static spinlock_t process_lock = SPINLOCK_INIT;
 
 /*
@@ -45,6 +48,37 @@ void process_init(void) {
     strcpy(idle->name, "kernel");
 
     current_process = idle;
+    foreground_process = idle;
+}
+
+static void foreground_restore_on_exit(struct process *proc) {
+    if (foreground_process != proc) return;
+    struct process *parent = proc->parent;
+    if (parent && parent->state != PROCESS_UNUSED &&
+        parent->state != PROCESS_ZOMBIE) {
+        foreground_process = parent;
+    } else {
+        foreground_process = &process_table[0];
+    }
+}
+
+bool process_foreground_acquire(struct process *child) {
+    uint64_t flags;
+    spinlock_acquire_irqsave(&process_lock, &flags);
+    bool allowed = current_process && child && child->parent == current_process &&
+                   foreground_process == current_process &&
+                   (child->state == PROCESS_READY || child->state == PROCESS_RUNNING);
+    if (allowed) foreground_process = child;
+    spinlock_release_irqrestore(&process_lock, flags);
+    return allowed;
+}
+
+bool process_foreground_read_allowed(void) {
+    uint64_t flags;
+    spinlock_acquire_irqsave(&process_lock, &flags);
+    bool allowed = current_process && current_process == foreground_process;
+    spinlock_release_irqrestore(&process_lock, flags);
+    return allowed;
 }
 
 /*
@@ -64,6 +98,9 @@ static struct process *find_free_slot(void) {
  * Calls the actual entry point and handles exit
  */
 static void process_entry_wrapper(void) {
+    /* New contexts begin with interrupts disabled until their stack is live. */
+    cpu_sti();
+
     /* Entry point is stored in r12 by process_create */
     void (*entry)(void);
     __asm__ volatile ("mov %%r12, %0" : "=r"(entry));
@@ -411,7 +448,48 @@ static bool map_elf_segment(pagetable_t address_space,
 /*
  * Create a new isolated ring-3 process from an ELF64 executable image
  */
-struct process *process_create_elf(const char *name, const void *image, size_t size) {
+static bool prepare_user_stack(pagetable_t address_space, int argc,
+                               const char *const argv[], uint64_t *stack_pointer) {
+    if (argc < 1 || argc > PROCESS_ARG_MAX || !argv || !stack_pointer) return false;
+
+    uint64_t top_page = USER_STACK_TOP - PAGE_SIZE;
+    uint64_t phys = vmm_virt_to_phys(address_space, top_page);
+    if (!phys) return false;
+
+    extern uint64_t hhdm_offset;
+    uint8_t *page = (uint8_t *)(phys + hhdm_offset);
+    memset(page, 0, PAGE_SIZE);
+
+    uint64_t pointers[PROCESS_ARG_MAX];
+    size_t used = 0;
+    size_t cursor = PAGE_SIZE;
+    for (int i = argc - 1; i >= 0; i--) {
+        if (!argv[i]) return false;
+        size_t length = strlen(argv[i]) + 1;
+        if (length > PROCESS_ARG_BYTES - used) return false;
+        used += length;
+        cursor -= length;
+        memcpy(page + cursor, argv[i], length);
+        pointers[i] = top_page + cursor;
+    }
+
+    /* argc, argv[], NULL, envp NULL, and an AT_NULL auxiliary entry. */
+    size_t word_count = (size_t)argc + 5;
+    cursor = (cursor - word_count * sizeof(uint64_t)) & ~(size_t)15;
+    uint64_t *words = (uint64_t *)(page + cursor);
+    words[0] = (uint64_t)argc;
+    for (int i = 0; i < argc; i++) words[i + 1] = pointers[i];
+    words[argc + 1] = 0;
+    words[argc + 2] = 0;
+    words[argc + 3] = 0;
+    words[argc + 4] = 0;
+    *stack_pointer = top_page + cursor;
+    return true;
+}
+
+struct process *process_create_elf_args(const char *name, const void *image,
+                                        size_t size, int argc,
+                                        const char *const argv[]) {
     const uint8_t *bytes = (const uint8_t *)image;
     const struct elf64_header *eh = (const struct elf64_header *)image;
 
@@ -457,9 +535,14 @@ struct process *process_create_elf(const char *name, const void *image, size_t s
         }
     }
 
+    uint64_t initial_stack;
+    if (!prepare_user_stack(address_space, argc, argv, &initial_stack)) {
+        vmm_destroy_address_space(address_space);
+        return NULL;
+    }
+
     struct process *proc = process_create_user_space(name, address_space,
-                                                     eh->entry,
-                                                     USER_STACK_TOP);
+                                                     eh->entry, initial_stack);
     if (!proc) {
         vmm_destroy_address_space(address_space);
         return NULL;
@@ -468,14 +551,20 @@ struct process *process_create_elf(const char *name, const void *image, size_t s
     return proc;
 }
 
+struct process *process_create_elf(const char *name, const void *image, size_t size) {
+    const char *argv[] = { name ? name : "user" };
+    return process_create_elf_args(name, image, size, 1, argv);
+}
+
 /*
  * Exit current process
  */
-void process_exit(int exit_code) {
+static void process_finish_current(int exit_code, bool from_interrupt) {
     uint64_t flags;
     spinlock_acquire_irqsave(&process_lock, &flags);
 
     if (current_process && current_process->pid != 0) {
+        foreground_restore_on_exit(current_process);
         for (int i = 1; i < MAX_PROCESSES; i++) {
             if (process_table[i].parent == current_process) {
                 process_table[i].parent = NULL;
@@ -489,24 +578,33 @@ void process_exit(int exit_code) {
 
     spinlock_release_irqrestore(&process_lock, flags);
 
-    /* Schedule next process */
-    schedule();
-
-    /* Should never reach here */
-    for (;;) {
-        __asm__ volatile ("hlt");
+    /* Exception handlers must leave cleanup to a later non-IRQ switch. */
+    if (from_interrupt) {
+        schedule_from_interrupt();
+    } else {
+        schedule();
     }
+
+    panic("No runnable process after exit");
+}
+
+void process_exit(int exit_code) {
+    process_finish_current(exit_code, false);
+}
+
+void process_exit_from_exception(int exit_code) {
+    process_finish_current(exit_code, true);
 }
 
 int process_kill(uint64_t pid) {
+    struct process *current = process_current();
+    if (!current) return -1;
+    return process_kill_as(pid, current->uid, current->is_admin);
+}
+
+int process_kill_as(uint64_t pid, uint32_t uid, bool is_admin) {
     if (pid == 0) {
         return -1;
-    }
-
-    struct process *current = process_current();
-    if (current && current->pid == pid) {
-        process_exit(-1);
-        return 0;
     }
 
     uint64_t flags;
@@ -518,13 +616,51 @@ int process_kill(uint64_t pid) {
         return -1;
     }
 
+    if (!is_admin &&
+        (proc->uid != uid || proc->is_admin ||
+         proc->page_table == vmm_get_kernel_pml4())) {
+        spinlock_release_irqrestore(&process_lock, flags);
+        return -1;
+    }
+
+    if (proc == current_process) {
+        spinlock_release_irqrestore(&process_lock, flags);
+        process_exit(-1);
+    }
+
     if (proc->state != PROCESS_ZOMBIE) {
+        foreground_restore_on_exit(proc);
+        for (int i = 1; i < MAX_PROCESSES; i++) {
+            if (process_table[i].parent == proc) process_table[i].parent = NULL;
+        }
         proc->exit_code = -1;
         proc->wait_observed = false;
         proc->state = PROCESS_ZOMBIE;
         scheduler_remove(proc);
     }
 
+    spinlock_release_irqrestore(&process_lock, flags);
+    return 0;
+}
+
+int process_detach(uint64_t pid) {
+    if (pid == 0) return -1;
+
+    uint64_t flags;
+    spinlock_acquire_irqsave(&process_lock, &flags);
+
+    struct process *proc = process_get(pid);
+    if (!current_process || !proc || proc->parent != current_process) {
+        spinlock_release_irqrestore(&process_lock, flags);
+        return -1;
+    }
+
+    if (proc == foreground_process) {
+        spinlock_release_irqrestore(&process_lock, flags);
+        return -1;
+    }
+
+    proc->parent = NULL;
     spinlock_release_irqrestore(&process_lock, flags);
     return 0;
 }
@@ -687,13 +823,14 @@ uint64_t process_count(void) {
     return count;
 }
 
-int process_fd_open(struct process *proc, struct vfs_node *node) {
-    if (!proc || !node) return -1;
+int process_fd_open(struct process *proc, struct vfs_node *node, uint8_t access) {
+    if (!proc || !node || (access != PROCESS_FD_READ && access != PROCESS_FD_WRITE)) return -1;
 
     for (int fd = 3; fd < PROCESS_MAX_FILES; fd++) {
         if (!proc->files[fd].used) {
             proc->files[fd].node = node;
             proc->files[fd].offset = 0;
+            proc->files[fd].access = access;
             proc->files[fd].used = true;
             return fd;
         }
@@ -707,6 +844,7 @@ int process_fd_read(struct process *proc, int fd, uint8_t *buffer, size_t size) 
     if (!proc || !buffer) return -1;
     if (fd < 3 || fd >= PROCESS_MAX_FILES) return -1;
     if (!proc->files[fd].used || !proc->files[fd].node) return -1;
+    if (!(proc->files[fd].access & PROCESS_FD_READ)) return -1;
     if (!vfs_can_read_as(proc->files[fd].node, proc->uid, proc->is_admin)) return -1;
 
     int bytes = vfs_read(proc->files[fd].node, proc->files[fd].offset, size, buffer);
@@ -722,6 +860,7 @@ int process_fd_write(struct process *proc, int fd, const uint8_t *buffer, size_t
     if (!proc || !buffer) return -1;
     if (fd < 3 || fd >= PROCESS_MAX_FILES) return -1;
     if (!proc->files[fd].used || !proc->files[fd].node) return -1;
+    if (!(proc->files[fd].access & PROCESS_FD_WRITE)) return -1;
     if (!vfs_can_write_as(proc->files[fd].node, proc->uid, proc->is_admin)) return -1;
 
     int bytes = vfs_write(proc->files[fd].node, proc->files[fd].offset, size, buffer);
@@ -743,6 +882,7 @@ int process_fd_close(struct process *proc, int fd) {
 
     proc->files[fd].node = NULL;
     proc->files[fd].offset = 0;
+    proc->files[fd].access = 0;
     proc->files[fd].used = false;
     return 0;
 }

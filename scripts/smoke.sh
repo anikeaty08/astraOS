@@ -31,6 +31,7 @@ rm -f "$SERIAL_LOG" "$QEMU_LOG"
 
 qemu-system-x86_64 \
     -cdrom "$ISO" \
+    -boot order=d \
     -drive "file=$DISK,format=raw,if=ide" \
     -m 256M \
     -serial "file:$SERIAL_LOG" \

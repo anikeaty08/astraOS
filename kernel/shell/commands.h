@@ -6,6 +6,8 @@
 #ifndef _ASTRA_SHELL_COMMANDS_H
 #define _ASTRA_SHELL_COMMANDS_H
 
+#include <stdbool.h>
+
 /*
  * Command function type
  */
@@ -32,7 +34,11 @@ void cmd_rm(int argc, char **argv);
 void cmd_mv(int argc, char **argv);
 void cmd_truncate(int argc, char **argv);
 void cmd_fsck(int argc, char **argv);
+
+/* Launch a native program using the authenticated session credentials. */
+bool shell_launch_user(const char *path, bool background, int *exit_status);
 void cmd_run(int argc, char **argv);
+void cmd_kill(int argc, char **argv);
 void cmd_ps(int argc, char **argv);
 void cmd_whoami(int argc, char **argv);
 void cmd_users(int argc, char **argv);

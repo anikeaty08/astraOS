@@ -591,6 +591,7 @@ static const struct pci_driver *pci_builtin_drivers[] = {
 static struct pci_probe_summary pci_last_summary;
 
 static void pci_init_builtin_drivers(void) {
+    usb_init();
     for (uint32_t i = 0; i < PCI_BUILTIN_DRIVER_COUNT; i++) {
         if (pci_builtin_drivers[i]->init) {
             pci_builtin_drivers[i]->init();

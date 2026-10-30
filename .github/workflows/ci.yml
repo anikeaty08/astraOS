@@ -28,3 +28,21 @@ jobs:
 
       - name: Smoke test
         run: sh scripts/smoke.sh
+
+      - name: User fault isolation test
+        run: make fault-smoke
+
+      - name: Preemption and process reuse test
+        run: make preemption-smoke
+
+      - name: Userspace file persistence test
+        run: make persistence-smoke
+
+      - name: Standalone editor test
+        run: make editor-smoke
+
+      - name: Full-disk save failure test
+        run: make save-failure-smoke
+
+      - name: Userspace session and recovery test
+        run: make session-smoke

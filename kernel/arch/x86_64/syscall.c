@@ -90,6 +90,8 @@ static int64_t sys_read(uint64_t fd, char *buf, size_t len) {
         return process_fd_read(current, (int)fd, (uint8_t *)buf, len);
     }
 
+    if (!process_foreground_read_allowed()) return -1;
+
     size_t read = 0;
     while (read < len) {
         char c = kgetc();
@@ -106,6 +108,7 @@ static int copy_user_string(uint64_t user_ptr, char *out, size_t out_size) {
     if (!out || out_size == 0) return -1;
 
     for (size_t i = 0; i < out_size; i++) {
+        if (user_ptr > USER_SPACE_TOP - 1 - i) return -1;
         if (!user_range_valid(user_ptr + i, 1)) {
             return -1;
         }
@@ -122,23 +125,27 @@ static int copy_user_string(uint64_t user_ptr, char *out, size_t out_size) {
     return -1;
 }
 
-static int64_t sys_open(const char *path) {
+static int64_t sys_open(const char *path, uint64_t mode) {
     char kernel_path[USER_PATH_MAX];
+
+    if (mode > 1) return -1;
 
     if (copy_user_string((uint64_t)path, kernel_path, sizeof(kernel_path)) < 0) {
         return -1;
     }
 
-    struct vfs_node *node = vfs_open(kernel_path);
+    struct vfs_node *node = mode == 0 ? vfs_open(kernel_path) : vfs_resolve_path(kernel_path);
     struct process *current = process_current();
     if (!node || vfs_is_directory(node) ||
-        !vfs_can_read_as(node, current ? current->uid : 0,
-                         current ? current->is_admin : true)) {
+        (mode == 0 ? !vfs_can_read_as(node, current ? current->uid : 0,
+                                     current ? current->is_admin : true)
+                   : !vfs_can_write_as(node, current ? current->uid : 0,
+                                      current ? current->is_admin : true))) {
         if (node) vfs_close(node);
         return -1;
     }
 
-    int fd = process_fd_open(current, node);
+    int fd = process_fd_open(current, node, mode == 0 ? PROCESS_FD_READ : PROCESS_FD_WRITE);
     if (fd < 0) {
         vfs_close(node);
         return -1;
@@ -171,7 +178,7 @@ static int64_t sys_create(const char *path) {
         return -1;
     }
 
-    int fd = process_fd_open(current, node);
+    int fd = process_fd_open(current, node, PROCESS_FD_WRITE);
     if (fd < 0) {
         vfs_close(node);
         return -1;
@@ -245,13 +252,8 @@ static int64_t sys_fsck(uint64_t repair) {
     return vfs_fsck(repair ? VFS_FSCK_REPAIR : 0);
 }
 
-static int64_t sys_spawn(const char *path) {
-    char kernel_path[USER_PATH_MAX];
-
-    if (copy_user_string((uint64_t)path, kernel_path, sizeof(kernel_path)) < 0) {
-        return -1;
-    }
-
+static int64_t spawn_kernel(const char *kernel_path, int argc,
+                            const char *const arguments[]) {
     struct vfs_node *node = vfs_open(kernel_path);
     struct process *current = process_current();
     if (!node || vfs_is_directory(node) ||
@@ -292,14 +294,51 @@ static int64_t sys_spawn(const char *path) {
 
     vfs_close(node);
 
-    struct process *child = process_create_elf(kernel_path, image, (size_t)size);
+    struct process *child = process_create_elf_args(kernel_path, image,
+                                                    (size_t)size, argc, arguments);
     kfree(image);
 
     if (!child) {
         return -1;
     }
 
+    /* A foreground parent hands the console to its new child. */
+    (void)process_foreground_acquire(child);
+
     return (int64_t)child->pid;
+}
+
+static int64_t sys_spawnv(const char *path, uint64_t argc,
+                          const char *const user_argv[]) {
+    char kernel_path[USER_PATH_MAX];
+    if (copy_user_string((uint64_t)path, kernel_path, sizeof(kernel_path)) < 0)
+        return -1;
+    if (argc < 1 || argc > PROCESS_ARG_MAX ||
+        !user_range_valid((uint64_t)user_argv,
+                          (size_t)argc * sizeof(*user_argv))) return -1;
+
+    char argument_bytes[PROCESS_ARG_MAX][PROCESS_ARG_BYTES];
+    const char *arguments[PROCESS_ARG_MAX];
+    size_t total = 0;
+    for (uint64_t i = 0; i < argc; i++) {
+        uint64_t pointer = (uint64_t)user_argv[i];
+        if (total >= PROCESS_ARG_BYTES ||
+            copy_user_string(pointer, argument_bytes[i],
+                             PROCESS_ARG_BYTES - total) < 0) return -1;
+        size_t length = 0;
+        while (argument_bytes[i][length]) length++;
+        total += length + 1;
+        arguments[i] = argument_bytes[i];
+    }
+    return spawn_kernel(kernel_path, (int)argc, arguments);
+}
+
+static int64_t sys_spawn(const char *path) {
+    char kernel_path[USER_PATH_MAX];
+    if (copy_user_string((uint64_t)path, kernel_path, sizeof(kernel_path)) < 0)
+        return -1;
+    const char *argv[] = { kernel_path };
+    return spawn_kernel(kernel_path, 1, argv);
 }
 
 static int64_t sys_wait(uint64_t pid, int *status) {
@@ -356,7 +395,7 @@ void syscall_handler(struct interrupt_frame *frame) {
             break;
 
         case SYS_OPEN:
-            result = sys_open((const char *)frame->rdi);
+            result = sys_open((const char *)frame->rdi, frame->rsi);
             break;
 
         case SYS_CLOSE:
@@ -386,6 +425,11 @@ void syscall_handler(struct interrupt_frame *frame) {
 
         case SYS_SPAWN:
             result = sys_spawn((const char *)frame->rdi);
+            break;
+
+        case SYS_SPAWNV:
+            result = sys_spawnv((const char *)frame->rdi, frame->rsi,
+                                (const char *const *)frame->rdx);
             break;
 
         case SYS_KILL:

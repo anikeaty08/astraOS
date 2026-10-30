@@ -860,6 +860,54 @@ bool usb_device_is_mass_storage(int index) {
     return index >= 0 && index < device_count && devices[index].mass_ready;
 }
 
+const struct pci_driver uhci_pci_driver = {
+    .name = "UHCI",
+    .class_code = 0x0C,
+    .class_mask = 0xFF,
+    .subclass = 0x03,
+    .subclass_mask = 0xFF,
+    .prog_if = 0x00,
+    .prog_if_mask = 0xFF,
+    .probe = uhci_probe,
+    .init = uhci_init,
+};
+
+const struct pci_driver ohci_pci_driver = {
+    .name = "OHCI",
+    .class_code = 0x0C,
+    .class_mask = 0xFF,
+    .subclass = 0x03,
+    .subclass_mask = 0xFF,
+    .prog_if = 0x10,
+    .prog_if_mask = 0xFF,
+    .probe = ohci_probe,
+    .init = ohci_init,
+};
+
+const struct pci_driver ehci_pci_driver = {
+    .name = "EHCI",
+    .class_code = 0x0C,
+    .class_mask = 0xFF,
+    .subclass = 0x03,
+    .subclass_mask = 0xFF,
+    .prog_if = 0x20,
+    .prog_if_mask = 0xFF,
+    .probe = ehci_probe,
+    .init = ehci_init,
+};
+
+const struct pci_driver xhci_pci_driver = {
+    .name = "XHCI",
+    .class_code = 0x0C,
+    .class_mask = 0xFF,
+    .subclass = 0x03,
+    .subclass_mask = 0xFF,
+    .prog_if = 0x30,
+    .prog_if_mask = 0xFF,
+    .probe = xhci_probe,
+    .init = xhci_init,
+};
+
 uint16_t usb_device_vendor(int index) {
     if (index < 0 || index >= device_count) {
         return 0;

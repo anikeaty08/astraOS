@@ -1,4 +1,6 @@
 #include "syscall.h"
+#include "shell/file_commands.h"
+#include <limits.h>
 
 static size_t strlen(const char *s) {
     size_t n = 0;
@@ -38,11 +40,27 @@ static int parse_pid(const char *s, long *pid) {
         if (*s < '0' || *s > '9') {
             return -1;
         }
-        value = value * 10 + (*s - '0');
+        int digit = *s - '0';
+        if (value > (LONG_MAX - digit) / 10) return -1;
+        value = value * 10 + digit;
         s++;
     }
 
     *pid = value;
+    return 0;
+}
+
+static int parse_exit_code(const char *text, int *code) {
+    int value = 0;
+    if (!*text) return -1;
+    while (*text) {
+        if (*text < '0' || *text > '9') return -1;
+        int digit = *text - '0';
+        if (value > (255 - digit) / 10) return -1;
+        value = value * 10 + digit;
+        text++;
+    }
+    *code = value;
     return 0;
 }
 
@@ -144,33 +162,27 @@ static void wait_pid(const char *arg) {
     puts("\n");
 }
 
-static void cat_file(const char *path) {
-    char buf[128];
-    long fd = sys_open(path);
-
-    if (fd < 0) {
-        puts("cat: cannot open file\n");
+static void run_program(char *command) {
+    const char *arguments[8];
+    int argc = 0;
+    char *cursor = command;
+    while (*cursor) {
+        while (*cursor == ' ' || *cursor == '\t') cursor++;
+        if (!*cursor) break;
+        if (argc == 8) {
+            puts("run: at most 8 arguments\n");
+            return;
+        }
+        arguments[argc++] = cursor;
+        while (*cursor && *cursor != ' ' && *cursor != '\t') cursor++;
+        if (*cursor) *cursor++ = '\0';
+    }
+    if (!argc) {
+        puts("usage: run /PROGRAM [arguments]\n");
         return;
     }
 
-    for (;;) {
-        long n = sys_read((int)fd, buf, sizeof(buf));
-        if (n < 0) {
-            puts("cat: read failed\n");
-            break;
-        }
-        if (n == 0) {
-            break;
-        }
-        sys_write(1, buf, (size_t)n);
-    }
-
-    sys_close((int)fd);
-    puts("\n");
-}
-
-static void run_program(const char *path) {
-    long pid = sys_spawn(path);
+    long pid = sys_spawnv(arguments[0], argc, arguments);
 
     if (pid < 0) {
         puts("run: failed to spawn program\n");
@@ -181,10 +193,11 @@ static void run_program(const char *path) {
     char buf[32];
     int pos = 0;
     char tmp[24];
+    long display_pid = pid;
 
-    while (pid > 0 && pos < (int)sizeof(tmp)) {
-        tmp[pos++] = (char)('0' + (pid % 10));
-        pid /= 10;
+    while (display_pid > 0 && pos < (int)sizeof(tmp)) {
+        tmp[pos++] = (char)('0' + (display_pid % 10));
+        display_pid /= 10;
     }
 
     int out = 0;
@@ -196,6 +209,15 @@ static void run_program(const char *path) {
     }
     buf[out++] = '\n';
     sys_write(1, buf, (size_t)out);
+
+    int status = 0;
+    if (sys_wait(pid, &status) < 0) {
+        puts("run: wait failed\n");
+        return;
+    }
+    puts("process exited ");
+    print_long(status);
+    puts("\n");
 }
 
 int main(void) {
@@ -216,7 +238,7 @@ int main(void) {
         trim_newline(line);
 
         if (strcmp(line, "help") == 0) {
-            puts("commands: help pid echo cat run kill wait exit yield\n");
+            puts("commands: help pid echo cat write run /PROGRAM [args] kill wait exit [code] yield\n");
         } else if (strcmp(line, "pid") == 0) {
             print_pid();
         } else if (strcmp(line, "yield") == 0) {
@@ -224,7 +246,9 @@ int main(void) {
         } else if (strcmp(line, "echo") == 0) {
             puts("echo from ring 3\n");
         } else if (starts_with(line, "cat ")) {
-            cat_file(line + 4);
+            user_cat_file(line + 4);
+        } else if (starts_with(line, "write ")) {
+            user_write_file(line + 6);
         } else if (starts_with(line, "run ")) {
             run_program(line + 4);
         } else if (starts_with(line, "kill ")) {
@@ -234,6 +258,13 @@ int main(void) {
         } else if (strcmp(line, "exit") == 0) {
             puts("leaving user shell\n");
             return 0;
+        } else if (starts_with(line, "exit ")) {
+            int code;
+            if (parse_exit_code(line + 5, &code) < 0) {
+                puts("exit: expected a code from 0 to 255\n");
+                continue;
+            }
+            return code;
         } else if (line[0] == '\0') {
             continue;
         } else {

@@ -74,10 +74,6 @@ static uint8_t rtl_inb(struct net_device *dev, uint16_t reg) {
     return inb((uint16_t)(dev->io_base + reg));
 }
 
-static uint16_t rtl_inw(struct net_device *dev, uint16_t reg) {
-    return inw((uint16_t)(dev->io_base + reg));
-}
-
 static uint32_t rtl_inl(struct net_device *dev, uint16_t reg) {
     return inl((uint16_t)(dev->io_base + reg));
 }

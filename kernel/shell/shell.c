@@ -13,6 +13,7 @@
 #include "../drivers/keyboard.h"
 #include "../drivers/pit.h"
 #include "../drivers/boot_animation.h"
+#include "../proc/scheduler.h"
 
 /*
  * Command buffer
@@ -119,6 +120,8 @@ void shell_execute(const char *line) {
         cmd_fsck(argc, argv);
     } else if (strcmp(cmd, "run") == 0) {
         cmd_run(argc, argv);
+    } else if (strcmp(cmd, "kill") == 0) {
+        cmd_kill(argc, argv);
     } else if (strcmp(cmd, "ps") == 0) {
         cmd_ps(argc, argv);
     } else if (strcmp(cmd, "whoami") == 0) {
@@ -169,6 +172,27 @@ static void print_prompt(void) {
     kprintf("$ ");
 }
 
+/* Keep the authenticated user in ring 3; recover through this shell. */
+static void start_user_session(void) {
+    for (int failures = 0; failures < 3; failures++) {
+        int status = 0;
+        kprintf("Starting userspace shell /SH\n");
+        if (!shell_launch_user("/SH", false, &status)) {
+            kprintf("User shell unavailable; entering kernel recovery shell\n");
+            return;
+        }
+        if (status == 0) {
+            kprintf("User session ended; entering kernel recovery shell\n");
+            return;
+        }
+        if (failures < 2) {
+            kprintf("User shell exited with status %d; restarting (%d/3)\n",
+                    status, failures + 1);
+        }
+    }
+    kprintf("User shell failed three times; entering kernel recovery shell\n");
+}
+
 /*
  * Main shell loop
  */
@@ -192,15 +216,17 @@ void shell_run(void) {
     /* Show creator credits */
     cmd_aniket(0, NULL);
 
+    start_user_session();
+
     print_prompt();
     cmd_pos = 0;
     cmd_buffer[0] = '\0';
 
     while (1) {
-        /* Check for rescheduling (cooperative multitasking point) */
+        /* Dispatch ready processes outside interrupt context. */
         if (pit_check_reschedule()) {
             pit_clear_reschedule();
-            /* Would call schedule() here if we had processes */
+            schedule();
         }
 
         /* Get character from available input sources */

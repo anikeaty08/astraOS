@@ -21,12 +21,17 @@
 #define USER_STACK_TOP      0x0000000080000000ULL
 #define USER_SPACE_TOP      0x0000800000000000ULL
 #define PROCESS_MAX_FILES   16
+#define PROCESS_FD_READ     1
+#define PROCESS_FD_WRITE    2
+#define PROCESS_ARG_MAX     8
+#define PROCESS_ARG_BYTES   512
 
 struct vfs_node;
 
 struct process_file {
     struct vfs_node *node;
     uint64_t offset;
+    uint8_t access;
     bool used;
 };
 
@@ -105,12 +110,24 @@ struct process *process_create_user(const char *name, const void *image, size_t 
 
 /* Create a new isolated ring-3 process from an ELF64 executable image */
 struct process *process_create_elf(const char *name, const void *image, size_t size);
+struct process *process_create_elf_args(const char *name, const void *image,
+                                        size_t size, int argc,
+                                        const char *const argv[]);
 
 /* Exit current process */
 void process_exit(int exit_code);
 
+/* Exit after a user exception without doing cleanup on the interrupt stack. */
+void process_exit_from_exception(int exit_code);
+
 /* Terminate a process by PID without signals */
 int process_kill(uint64_t pid);
+
+/* Terminate using explicit caller credentials (for the kernel shell). */
+int process_kill_as(uint64_t pid, uint32_t uid, bool is_admin);
+
+/* Release the current process's wait ownership of a child. */
+int process_detach(uint64_t pid);
 
 /* Collect exit status for a zombie child */
 int process_wait(uint64_t pid, int *status);
@@ -140,10 +157,14 @@ void process_unblock(struct process *proc);
 uint64_t process_count(void);
 
 /* Process file descriptor helpers */
-int process_fd_open(struct process *proc, struct vfs_node *node);
+int process_fd_open(struct process *proc, struct vfs_node *node, uint8_t access);
 int process_fd_read(struct process *proc, int fd, uint8_t *buffer, size_t size);
 int process_fd_write(struct process *proc, int fd, const uint8_t *buffer, size_t size);
 int process_fd_close(struct process *proc, int fd);
 void process_set_credentials(struct process *proc, uint32_t uid, bool is_admin);
+
+/* The foreground process is the only user process allowed to read console fd 0. */
+bool process_foreground_acquire(struct process *child);
+bool process_foreground_read_allowed(void);
 
 #endif /* _ASTRA_PROC_PROCESS_H */

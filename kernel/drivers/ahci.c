@@ -434,3 +434,15 @@ int ahci_read(int index, uint64_t lba, uint32_t count, void *buffer) {
 int ahci_write(int index, uint64_t lba, uint32_t count, const void *buffer) {
     return ahci_rw(index, lba, count, (void *)buffer, true);
 }
+
+const struct pci_driver ahci_pci_driver = {
+    .name = "AHCI",
+    .class_code = 0x01,
+    .class_mask = 0xFF,
+    .subclass = 0x06,
+    .subclass_mask = 0xFF,
+    .prog_if = 0x01,
+    .prog_if_mask = 0xFF,
+    .probe = ahci_probe,
+    .init = ahci_init,
+};

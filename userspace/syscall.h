@@ -19,6 +19,7 @@
 #define SYS_RENAME 12
 #define SYS_TRUNCATE 13
 #define SYS_FSCK   14
+#define SYS_SPAWNV 15
 
 static inline long syscall3(long number, long a0, long a1, long a2) {
     long ret;
@@ -37,6 +38,10 @@ static inline long sys_read(int fd, void *buf, size_t len) {
 
 static inline long sys_open(const char *path) {
     return syscall3(SYS_OPEN, (long)path, 0, 0);
+}
+
+static inline long sys_open_write(const char *path) {
+    return syscall3(SYS_OPEN, (long)path, 1, 0);
 }
 
 static inline long sys_close(int fd) {
@@ -65,6 +70,10 @@ static inline long sys_fsck(int repair) {
 
 static inline long sys_spawn(const char *path) {
     return syscall3(SYS_SPAWN, (long)path, 0, 0);
+}
+
+static inline long sys_spawnv(const char *path, int argc, const char *const argv[]) {
+    return syscall3(SYS_SPAWNV, (long)path, argc, (long)argv);
 }
 
 static inline long sys_kill(long pid) {
