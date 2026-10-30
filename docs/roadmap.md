@@ -12,8 +12,9 @@ Status words mean: **verified** has a passing repository/QEMU check; **present**
 
 - FAT16/VFS create, read, write, truncate, unlink and rename primitives. A full-disk write failure now preserves the original file through temporary-file replacement; interruption during rename or power loss is not yet proven.
 - A userspace single-line `write` command and `make persistence-smoke` now prove create, replace, and exact readback after a normal QEMU guest reboot. This is narrower than an editor or crash-safe storage.
-- A standalone bounded line editor and `make editor-smoke` prove multi-line editing, discard, and reboot readback. The userspace shell is still not the default session.
-- Basic userspace shell and `/PKG`; the shell now waits for foreground child programs, while default userspace startup and terminal ownership remain incomplete.
+- A standalone bounded line editor and `make editor-smoke` prove multi-line editing, discard, and reboot readback.
+- The userspace shell is the default session after login; `make session-smoke` proves bounded restart and kernel recovery fallback. Login/supervision remain kernel-owned, and signals, job control and terminal ownership are still incomplete.
+- `/PKG` is present but not a verified package-management workflow.
 - Framebuffer GUI, input, PCI, disk, USB and raw NIC drivers; named physical-machine support and a full userspace desktop/network service are not proven.
 
 ## Milestones in dependency order
@@ -35,13 +36,13 @@ This backlog is a direction, not a promise that all items belong in one release.
 
 ## Next two engineering slices
 
-1. **Userspace session** — add supervised init/default userspace shell, app argument passing, and a clear console owner so applications can be restarted after faults.
+1. **Userspace session continuation** — add app argument passing, explicit terminal ownership/signals, and later a userspace init/service manager. The default shell and bounded kernel supervisor now pass QEMU checks.
 2. **Durability API** — define append and flush semantics at the syscall/VFS/block boundaries, then add interrupted-write tests. This is separate from normal reboot persistence.
 
 ## Release gates
 
 - Build from clean checkout with pinned dependencies and documented toolchain.
-- Automated boot, fault, preemption, persistent-file, editor, and full-disk save-failure checks pass in CI.
+- Automated boot, fault, preemption, persistent-file, editor, full-disk save-failure, and session checks pass in CI.
 - Each advertised driver/workflow has a reproducible test and known limitations.
 - Physical-hardware claims identify machine model, firmware, storage, input and display devices.
 - No “durable” or “crash-safe” claim until write-cache flush and interrupted-write evidence exists.

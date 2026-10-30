@@ -69,7 +69,24 @@
         "Run, interrupt, and exit user programs without losing input or output"
       ],
       "status": "pending",
-      "evidence": []
+      "evidence": [
+        "2026-10-30: make session-smoke boots directly into /SH and foreground /HELLO returns to the prompt; interrupting an active foreground child from that shell still needs signals or a terminal control path."
+      ]
+    },
+    {
+      "id": "default-userspace-session",
+      "description": "After login, /SH is the default foreground shell with bounded restart and kernel recovery fallback.",
+      "priority": 2,
+      "dependencies": ["process-lifecycle"],
+      "acceptance_steps": [
+        "Login reaches the userspace prompt without manually running /SH",
+        "A nonzero shell exit restarts it, with a bounded failure limit",
+        "A clean exit or missing /SH reaches the kernel recovery prompt"
+      ],
+      "status": "passing",
+      "evidence": [
+        "2026-10-30: make session-smoke launched /SH after login, ran /HELLO as a foreground child, restarted after exit 1, stopped after three failures, returned to recovery on exit 0, and fell back when /SH was removed from the disk image."
+      ]
     },
     {
       "id": "normal-reboot-text-persistence",

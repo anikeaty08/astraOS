@@ -172,6 +172,27 @@ static void print_prompt(void) {
     kprintf("$ ");
 }
 
+/* Keep the authenticated user in ring 3; recover through this shell. */
+static void start_user_session(void) {
+    for (int failures = 0; failures < 3; failures++) {
+        int status = 0;
+        kprintf("Starting userspace shell /SH\n");
+        if (!shell_launch_user("/SH", false, &status)) {
+            kprintf("User shell unavailable; entering kernel recovery shell\n");
+            return;
+        }
+        if (status == 0) {
+            kprintf("User session ended; entering kernel recovery shell\n");
+            return;
+        }
+        if (failures < 2) {
+            kprintf("User shell exited with status %d; restarting (%d/3)\n",
+                    status, failures + 1);
+        }
+    }
+    kprintf("User shell failed three times; entering kernel recovery shell\n");
+}
+
 /*
  * Main shell loop
  */
@@ -194,6 +215,8 @@ void shell_run(void) {
     
     /* Show creator credits */
     cmd_aniket(0, NULL);
+
+    start_user_session();
 
     print_prompt();
     cmd_pos = 0;

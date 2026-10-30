@@ -59,7 +59,7 @@ USER_CFLAGS := -ffreestanding -fno-stack-protector -fno-pie -fno-pic \
 # Limine bootloader path (adjust after cloning)
 LIMINE_DIR := limine
 
-.PHONY: all clean run run-debug run-gdb iso limine disk userspace smoke fault-smoke preemption-smoke persistence-smoke editor-smoke save-failure-smoke
+.PHONY: all clean run run-debug run-gdb iso limine disk userspace smoke fault-smoke preemption-smoke persistence-smoke editor-smoke save-failure-smoke session-smoke
 
 all: $(KERNEL) userspace
 
@@ -186,6 +186,9 @@ editor-smoke: iso disk
 save-failure-smoke: iso disk
 	python3 ./scripts/save-failure-smoke.py
 
+session-smoke: iso disk
+	python3 ./scripts/session-smoke.py
+
 # Clean build artifacts
 clean:
 	rm -f $(OBJECTS) $(KERNEL) $(ISO) $(DISK)
@@ -215,6 +218,7 @@ help:
 	@echo "  persistence-smoke - Verify userspace saves survive a guest reboot"
 	@echo "  editor-smoke - Verify multi-line editing and reboot persistence"
 	@echo "  save-failure-smoke - Verify a full disk cannot destroy the old file"
+	@echo "  session-smoke - Verify default userspace session and recovery fallback"
 	@echo "  clean      - Remove build artifacts"
 	@echo "  distclean  - Remove everything including Limine"
 	@echo "  help       - Show this help"

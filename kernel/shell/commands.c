@@ -632,37 +632,31 @@ void cmd_fsck(int argc, char **argv) {
 /*
  * run - Start a ring-3 user binary from the filesystem
  */
-void cmd_run(int argc, char **argv) {
-    bool background = argc == 3 && strcmp(argv[2], "&") == 0;
-    if (argc < 2 || (argc != 2 && !background)) {
-        kprintf("Usage: run <binary> [&]\n");
-        return;
-    }
-
-    struct vfs_node *node = vfs_open(argv[1]);
+bool shell_launch_user(const char *path, bool background, int *exit_status) {
+    struct vfs_node *node = vfs_open(path);
     if (!node) {
-        kprintf("run: %s: No such file or directory\n", argv[1]);
-        return;
+        kprintf("run: %s: No such file or directory\n", path);
+        return false;
     }
 
     if (vfs_is_directory(node)) {
-        kprintf("run: %s: Is a directory\n", argv[1]);
+        kprintf("run: %s: Is a directory\n", path);
         vfs_close(node);
-        return;
+        return false;
     }
 
     uint64_t size = vfs_size(node);
     if (size == 0 || size > 1024 * 1024) {
-        kprintf("run: %s: unsupported binary size\n", argv[1]);
+        kprintf("run: %s: unsupported binary size\n", path);
         vfs_close(node);
-        return;
+        return false;
     }
 
     uint8_t *image = kmalloc((size_t)size);
     if (!image) {
         kprintf("run: out of memory\n");
         vfs_close(node);
-        return;
+        return false;
     }
 
     uint64_t offset = 0;
@@ -674,10 +668,10 @@ void cmd_run(int argc, char **argv) {
 
         int bytes = vfs_read(node, offset, to_read, image + offset);
         if (bytes <= 0) {
-            kprintf("run: failed reading %s\n", argv[1]);
+            kprintf("run: failed reading %s\n", path);
             kfree(image);
             vfs_close(node);
-            return;
+            return false;
         }
 
         offset += (uint64_t)bytes;
@@ -686,9 +680,9 @@ void cmd_run(int argc, char **argv) {
     struct process *proc = NULL;
     if (size >= 4 && image[0] == 0x7F && image[1] == 'E' &&
         image[2] == 'L' && image[3] == 'F') {
-        proc = process_create_elf(argv[1], image, (size_t)size);
+        proc = process_create_elf(path, image, (size_t)size);
     } else {
-        proc = process_create_user(argv[1], image, (size_t)size);
+        proc = process_create_user(path, image, (size_t)size);
     }
 
     kfree(image);
@@ -696,7 +690,7 @@ void cmd_run(int argc, char **argv) {
 
     if (!proc) {
         kprintf("run: failed to create user process\n");
-        return;
+        return false;
     }
 
     process_set_credentials(proc, user_get_current_uid(), user_is_admin());
@@ -704,19 +698,30 @@ void cmd_run(int argc, char **argv) {
         kprintf("run: could not detach PID %llu\n", proc->pid);
         background = false;
     }
-    kprintf("Started user process %s as PID %llu\n", argv[1], proc->pid);
+    kprintf("Started user process %s as PID %llu\n", path, proc->pid);
 
     if (background) {
-        return;
+        return true;
     }
 
     int status;
     if (process_wait(proc->pid, &status) < 0) {
         kprintf("run: could not wait for PID %llu\n", proc->pid);
-        return;
+        return false;
     }
 
     kprintf("Process %llu exited with status %d\n", proc->pid, status);
+    if (exit_status) *exit_status = status;
+    return true;
+}
+
+void cmd_run(int argc, char **argv) {
+    bool background = argc == 3 && strcmp(argv[2], "&") == 0;
+    if (argc < 2 || (argc != 2 && !background)) {
+        kprintf("Usage: run <binary> [&]\n");
+        return;
+    }
+    (void)shell_launch_user(argv[1], background, NULL);
 }
 
 void cmd_kill(int argc, char **argv) {

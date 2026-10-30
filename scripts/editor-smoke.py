@@ -22,8 +22,6 @@ def main():
     try:
         guest = Guest()
         guest.login()
-        guest.send("run /SH")
-        guest.wait_for("user$ ")
         guest.send("run /EDIT")
         guest.wait_for("path: ")
         guest.send("/TOO-LONG-NAME.TXT")
@@ -81,8 +79,6 @@ def main():
 
         guest = Guest()
         guest.login()
-        guest.send("run /SH")
-        guest.wait_for("user$ ")
         guest.send(f"cat {PATH}")
         guest.wait_for("revised\nbeta")
         guest.wait_for("user$ ")

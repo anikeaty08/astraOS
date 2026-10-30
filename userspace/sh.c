@@ -47,6 +47,19 @@ static int parse_pid(const char *s, long *pid) {
     return 0;
 }
 
+static int parse_exit_code(const char *text, int *code) {
+    int value = 0;
+    if (!*text) return -1;
+    while (*text) {
+        if (*text < '0' || *text > '9') return -1;
+        value = value * 10 + (*text - '0');
+        if (value > 255) return -1;
+        text++;
+    }
+    *code = value;
+    return 0;
+}
+
 static void print_long(long value) {
     char buf[32];
     int out = 0;
@@ -202,7 +215,7 @@ int main(void) {
         trim_newline(line);
 
         if (strcmp(line, "help") == 0) {
-            puts("commands: help pid echo cat write run kill wait exit yield\n");
+            puts("commands: help pid echo cat write run kill wait exit [code] yield\n");
         } else if (strcmp(line, "pid") == 0) {
             print_pid();
         } else if (strcmp(line, "yield") == 0) {
@@ -222,6 +235,13 @@ int main(void) {
         } else if (strcmp(line, "exit") == 0) {
             puts("leaving user shell\n");
             return 0;
+        } else if (starts_with(line, "exit ")) {
+            int code;
+            if (parse_exit_code(line + 5, &code) < 0) {
+                puts("exit: expected a code from 0 to 255\n");
+                continue;
+            }
+            return code;
         } else if (line[0] == '\0') {
             continue;
         } else {

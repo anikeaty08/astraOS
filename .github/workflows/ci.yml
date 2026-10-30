@@ -43,3 +43,6 @@ jobs:
 
       - name: Full-disk save failure test
         run: make save-failure-smoke
+
+      - name: Userspace session and recovery test
+        run: make session-smoke

@@ -15,8 +15,6 @@ def main():
     try:
         guest = Guest()
         guest.login()
-        guest.send("run /SH")
-        guest.wait_for("user$ ")
         guest.send(f"write {FILE_PATH} first version")
         guest.wait_for("saved")
         guest.wait_for("user$ ")
@@ -36,8 +34,6 @@ def main():
 
         guest = Guest()
         guest.login()
-        guest.send("run /SH")
-        guest.wait_for("user$ ")
         guest.send(f"cat {FILE_PATH}")
         guest.wait_for("final version")
         guest.wait_for("user$ ")

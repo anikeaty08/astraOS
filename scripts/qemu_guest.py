@@ -45,7 +45,7 @@ class Guest:
         self.send("tester")
         self.wait_for("Password:")
         self.send("testpass")
-        self.wait_for("$ ")
+        self.wait_for("user$ ")
 
     def close(self):
         if self.process.poll() is None:

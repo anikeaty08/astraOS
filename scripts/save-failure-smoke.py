@@ -48,8 +48,6 @@ def main():
         prepare_full_disk()
         guest = Guest()
         guest.login()
-        guest.send("run /SH")
-        guest.wait_for("user$ ")
         guest.send(f"write {PATH} replacement")
         guest.wait_for("write: save failed")
         guest.wait_for("user$ ")

@@ -8,12 +8,12 @@ The [vision](docs/vision.md), [system architecture](docs/architecture.md), [rese
 
 - Limine boot into an x86_64 kernel with serial/framebuffer console and a kernel recovery shell.
 - Physical and virtual memory management, ring 3 ELF programs, syscalls, process scheduling and fault isolation.
-- Timer preemption of user programs, background launch/kill, exit/reap, and a basic userspace shell with foreground child execution.
+- Timer preemption of user programs, background launch/kill, exit/reap, and a default userspace shell with foreground child execution. The kernel shell is available when the user shell exits or fails to start.
 - A standalone bounded line editor (`/EDIT`) with print, append, insert, delete, save, and discard commands.
 - VFS and FAT16 file operations. Userspace replacement writes a temporary file first and preserves the old file on a tested full-disk write failure. Normal QEMU reboot persistence passes; power-loss safety is **not verified**.
 - Device-driver code including ATA, AHCI, NVMe, USB and RTL8139. Presence of a driver does not imply tested hardware support or a working TCP/IP stack.
 
-QEMU integration checks currently cover boot, user fault recovery, preemption, and process-slot reuse. The default interactive shell is still kernel-owned. No supported physical-machine release, userspace desktop, or application-level networking is claimed yet.
+QEMU integration checks currently cover boot, user fault recovery, preemption, process-slot reuse, the default userspace session, and text workflows. Login and the limited session supervisor are still kernel-owned. No supported physical-machine release, userspace desktop, or application-level networking is claimed yet.
 
 ## Build and run
 
@@ -32,7 +32,7 @@ qemu-system-x86_64 -cdrom astraos.iso -boot order=d \
   -drive file=disk.img,format=raw,if=ide -m 256M -serial stdio
 ```
 
-At the kernel shell, try `help`, `ls /`, `run /HELLO`, or `run /SH` to enter the userspace shell. From `/SH`, use `run /EDIT`, enter a root-level 8.3 path such as `/NOTE.TXT`, type `h` for editor commands, and `w` to save. The editor currently supports up to 32 lines of 95 bytes each. See the [editor feature contract](docs/features/text-editor.md) for limits.
+After login, AstraOS starts the userspace shell at `user$ `. Try `run /HELLO` or `run /EDIT`; the editor asks for a root-level 8.3 path such as `/NOTE.TXT`. Type `h` for editor commands and `w` to save. `exit` returns to the kernel recovery shell at `$ `, and `exit 1` exercises supervised restart. The editor currently supports up to 32 lines of 95 bytes each. See the [editor feature contract](docs/features/text-editor.md) and [session contract](docs/features/userspace-session.md) for limits.
 
 ## Checks
 
@@ -43,6 +43,7 @@ make preemption-smoke
 make persistence-smoke
 make editor-smoke
 make save-failure-smoke
+make session-smoke
 ```
 
 These checks use QEMU. The persistence and editor checks recreate `disk.img` once, then reboot without recreating it and check exact bytes. The full-disk check verifies that an ordinary failed replacement leaves the original intact. The checks do not establish crash-safe file writes or real-hardware support. The [feature tracker](.agent-state/feature-list.json) records acceptance evidence.

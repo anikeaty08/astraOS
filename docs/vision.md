@@ -31,6 +31,6 @@ The differentiator should be **recovery and visibility built into the experience
 
 ## Current baseline (2026-10-30)
 
-The repository boots a Limine-loaded x86_64 kernel. It has virtual memory, ring 3 ELF loading, system calls, a kernel recovery shell, a basic userspace shell, FAT16/VFS read and write primitives, and several device drivers. Automated QEMU checks demonstrate that user faults are contained and two CPU-bound user processes can be preempted and killed; 70 later child launches exercise process-slot reuse. This does **not** prove saved files survive reboot, storage survives power loss, networking works at the application layer, physical hardware is supported, or the desktop is usable.
+The repository boots a Limine-loaded x86_64 kernel. It has virtual memory, ring 3 ELF loading, system calls, a kernel recovery shell, a default userspace shell, FAT16/VFS read and write primitives, and several device drivers. Automated QEMU checks demonstrate user fault containment, preemption of two CPU-bound user processes, process-slot reuse, text saves across normal reboot, and fallback from a failed userspace session. This does **not** prove storage survives power loss, networking works at the application layer, physical hardware is supported, or the desktop is usable.
 
 The first user-visible proof is now a single-line userspace save and replacement that survives a normal QEMU guest reboot. A complete multi-line editor, interrupted-write recovery, and physical hardware remain open work. See [the focused feature contract](features/persistent-text.md).

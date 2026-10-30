@@ -19,7 +19,7 @@ flowchart TB
   Desktop --> Devices
 ```
 
-The kernel owns privileged hardware access, isolation, scheduling, VM, system-call validation, and shared resource arbitration. User programs own policy and interaction: shell parsing, editing, services, network clients, and eventually the desktop. The kernel shell stays as a recovery interface until userspace startup, input routing, and failure restart are proven.
+The kernel owns privileged hardware access, isolation, scheduling, VM, system-call validation, and shared resource arbitration. User programs own policy and interaction: shell parsing, editing, services, network clients, and eventually the desktop. The kernel now launches `/SH` after login and returns to its recovery shell on a clean exit, repeated failure, or missing binary. A full terminal and userspace init remain future work.
 
 ## Contracts by subsystem
 

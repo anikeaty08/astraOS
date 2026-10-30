@@ -64,6 +64,8 @@ def main():
         send("tester")
         wait_for("Password:")
         send("testpass")
+        wait_for("user$ ")
+        send("exit")
         wait_for("$ ")
         send("run /FAULT")
         wait_for("FAULT_TEST_BEGIN")
