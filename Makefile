@@ -49,7 +49,7 @@ KERNEL := iso/kernel.elf
 ISO := astraos.iso
 DISK := disk.img
 USER_BUILD := build/user
-USER_PROGRAMS := sh hello pkg fault spin
+USER_PROGRAMS := sh hello pkg fault spin edit
 USER_BINS := $(addprefix $(USER_BUILD)/,$(USER_PROGRAMS))
 USER_CFLAGS := -ffreestanding -fno-stack-protector -fno-pie -fno-pic \
                -mno-red-zone -mno-80387 -mno-mmx -mno-sse -mno-sse2 \
@@ -59,7 +59,7 @@ USER_CFLAGS := -ffreestanding -fno-stack-protector -fno-pie -fno-pic \
 # Limine bootloader path (adjust after cloning)
 LIMINE_DIR := limine
 
-.PHONY: all clean run run-debug run-gdb iso limine disk userspace smoke fault-smoke preemption-smoke persistence-smoke
+.PHONY: all clean run run-debug run-gdb iso limine disk userspace smoke fault-smoke preemption-smoke persistence-smoke editor-smoke
 
 all: $(KERNEL) userspace
 
@@ -82,6 +82,9 @@ $(USER_BUILD)/crt0.o: userspace/crt0.asm | $(USER_BUILD)
 
 $(USER_BUILD)/sh: userspace/sh.c userspace/shell/file_commands.c userspace/shell/file_commands.h $(USER_BUILD)/crt0.o userspace/linker.ld userspace/syscall.h | $(USER_BUILD)
 	$(CC) $(USER_CFLAGS) $(USER_BUILD)/crt0.o userspace/sh.c userspace/shell/file_commands.c -o $@
+
+$(USER_BUILD)/edit: userspace/apps/edit/main.c userspace/apps/edit/document.c userspace/apps/edit/document.h $(USER_BUILD)/crt0.o userspace/linker.ld userspace/syscall.h | $(USER_BUILD)
+	$(CC) $(USER_CFLAGS) $(USER_BUILD)/crt0.o userspace/apps/edit/main.c userspace/apps/edit/document.c -o $@
 
 $(USER_BUILD)/%: userspace/%.c $(USER_BUILD)/crt0.o userspace/linker.ld userspace/syscall.h | $(USER_BUILD)
 	$(CC) $(USER_CFLAGS) $(USER_BUILD)/crt0.o $< -o $@
@@ -127,6 +130,7 @@ disk: userspace
 	mcopy -i $(DISK) $(USER_BUILD)/pkg ::/PKG
 	mcopy -i $(DISK) $(USER_BUILD)/fault ::/FAULT
 	mcopy -i $(DISK) $(USER_BUILD)/spin ::/SPIN
+	mcopy -i $(DISK) $(USER_BUILD)/edit ::/EDIT
 
 # Run in QEMU
 run: iso disk
@@ -176,6 +180,9 @@ preemption-smoke: iso disk
 persistence-smoke: iso disk
 	python3 ./scripts/persistence-smoke.py
 
+editor-smoke: iso disk
+	python3 ./scripts/editor-smoke.py
+
 # Clean build artifacts
 clean:
 	rm -f $(OBJECTS) $(KERNEL) $(ISO) $(DISK)
@@ -203,6 +210,7 @@ help:
 	@echo "  fault-smoke - Verify user faults leave the shell and other apps usable"
 	@echo "  preemption-smoke - Verify busy apps can be killed and process slots reused"
 	@echo "  persistence-smoke - Verify userspace saves survive a guest reboot"
+	@echo "  editor-smoke - Verify multi-line editing and reboot persistence"
 	@echo "  clean      - Remove build artifacts"
 	@echo "  distclean  - Remove everything including Limine"
 	@echo "  help       - Show this help"

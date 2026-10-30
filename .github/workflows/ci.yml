@@ -34,3 +34,9 @@ jobs:
 
       - name: Preemption and process reuse test
         run: make preemption-smoke
+
+      - name: Userspace file persistence test
+        run: make persistence-smoke
+
+      - name: Standalone editor test
+        run: make editor-smoke

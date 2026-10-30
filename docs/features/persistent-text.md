@@ -18,4 +18,4 @@ The test uses a root-level 8.3 filename, checks save responses, checks the repla
 
 ## Follow-up after acceptance
 
-Extract the line editor as a standalone ELF app once argument passing and terminal ownership are defined. Add multi-line editing, append/insert/delete, explicit save and discard, and file-size limits. Introduce a writable-open mode rather than relying indefinitely on create/truncate. Add `fsync`/block flush and fault injection before promising crash-safe saves.
+Build a standalone line editor with multi-line editing, append/insert/delete, explicit save and discard, and file-size limits. The current writable-open mode supports this but does not provide atomic save. Add `fsync`/block flush and fault injection before promising crash-safe saves.

@@ -157,10 +157,11 @@ static void run_program(const char *path) {
     char buf[32];
     int pos = 0;
     char tmp[24];
+    long display_pid = pid;
 
-    while (pid > 0 && pos < (int)sizeof(tmp)) {
-        tmp[pos++] = (char)('0' + (pid % 10));
-        pid /= 10;
+    while (display_pid > 0 && pos < (int)sizeof(tmp)) {
+        tmp[pos++] = (char)('0' + (display_pid % 10));
+        display_pid /= 10;
     }
 
     int out = 0;
@@ -172,6 +173,15 @@ static void run_program(const char *path) {
     }
     buf[out++] = '\n';
     sys_write(1, buf, (size_t)out);
+
+    int status = 0;
+    if (sys_wait(pid, &status) < 0) {
+        puts("run: wait failed\n");
+        return;
+    }
+    puts("process exited ");
+    print_long(status);
+    puts("\n");
 }
 
 int main(void) {

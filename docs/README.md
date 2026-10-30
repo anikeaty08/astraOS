@@ -9,6 +9,7 @@ The documents describe a target, not a claim that every capability already exist
 4. [Feature inventory and delivery plan](roadmap.md) — ordered slices with acceptance gates.
 5. [First feature: persistent text workflow](features/persistent-text.md) — implementation contract.
 6. [Repository layout](repository-layout.md) — current ownership and incremental folder migration.
+7. [Standalone text editor](features/text-editor.md) — next userspace application contract.
 
 The current implementation evidence lives in [the feature tracker](../.agent-state/feature-list.json).
 Update the relevant document when a decision or contract changes; keep the README short.

@@ -12,7 +12,8 @@ Status words mean: **verified** has a passing repository/QEMU check; **present**
 
 - FAT16/VFS create, read, write, truncate, unlink and rename primitives; interrupted-write behavior is not yet proven.
 - A userspace single-line `write` command and `make persistence-smoke` now prove create, replace, and exact readback after a normal QEMU guest reboot. This is narrower than an editor or crash-safe storage.
-- Basic userspace shell and `/PKG`; userspace shell is not the default session and has no text editing command.
+- A standalone bounded line editor and `make editor-smoke` prove multi-line editing, discard, and reboot readback. The userspace shell is still not the default session.
+- Basic userspace shell and `/PKG`; the shell now waits for foreground child programs, while default userspace startup and terminal ownership remain incomplete.
 - Framebuffer GUI, input, PCI, disk, USB and raw NIC drivers; named physical-machine support and a full userspace desktop/network service are not proven.
 
 ## Milestones in dependency order
@@ -34,8 +35,8 @@ This backlog is a direction, not a promise that all items belong in one release.
 
 ## Next two engineering slices
 
-1. **Userspace text command and reboot test** — scope in [persistent-text.md](features/persistent-text.md). Touch userspace shell, a dedicated QEMU test, and docs. Avoid kernel changes unless a failing contract requires one.
-2. **Durability API** — after slice 1's writable-open mode, define append and flush semantics at the syscall/VFS/block boundaries, then add interrupted-write tests. This is separate from simply demonstrating normal reboot persistence.
+1. **Userspace session** — add supervised init/default userspace shell, app argument passing, and a clear console owner so applications can be restarted after faults.
+2. **Durability API** — define append and flush semantics at the syscall/VFS/block boundaries, then add interrupted-write tests. This is separate from normal reboot persistence.
 
 ## Release gates
 

@@ -101,15 +101,17 @@
     },
     {
       "id": "text-editor",
-      "description": "A userspace editor can open, modify, and save text files.",
+      "description": "A standalone userspace line editor can open, modify, save, and discard bounded text files.",
       "priority": 3,
       "dependencies": ["userland-shell", "persistent-files"],
       "acceptance_steps": [
         "Open a file, change text, save, and exit",
         "Reopen the file after reboot and verify changes"
       ],
-      "status": "pending",
-      "evidence": []
+      "status": "passing",
+      "evidence": [
+        "2026-10-30: make editor-smoke launched /EDIT from /SH in the foreground, inserted and deleted lines, refused a dirty quit, saved, discarded a later edit, reopened, saved again, rebooted with the same disk image, and compared exact host-visible bytes."
+      ]
     },
     {
       "id": "real-hardware-boot",
