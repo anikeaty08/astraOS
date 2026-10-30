@@ -25,3 +25,4 @@ An overlong input command is drained to its newline and rejected as a whole. The
 2. Reopen the note in `/EDIT`, change a line, save, reboot the guest with the same disk image, and compare exact bytes from the host.
 3. Verify `q` refuses dirty changes and `q!` discards them; invalid paths and oversized inputs leave existing data unchanged.
 4. Existing boot, fault, preemption, and persistence checks continue to pass.
+5. Fill the disk, attempt replacement through both the shell and editor, and verify the exact original bytes remain after reported failure.

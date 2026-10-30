@@ -87,6 +87,21 @@
       ]
     },
     {
+      "id": "full-disk-save-preserves-original",
+      "description": "A failed userspace replacement on a full FAT16 disk leaves the previous file intact.",
+      "priority": 2,
+      "dependencies": ["normal-reboot-text-persistence"],
+      "acceptance_steps": [
+        "Fill the FAT16 disk until no free clusters remain",
+        "Attempt replacement from the userspace shell and editor",
+        "Verify both report failure and the exact original bytes remain"
+      ],
+      "status": "passing",
+      "evidence": [
+        "2026-10-30: make save-failure-smoke filled the FAT16 data area, observed write and editor save errors, and compared /NOTE.TXT to exact original bytes after both attempts."
+      ]
+    },
+    {
       "id": "persistent-files",
       "description": "A user can edit a file, reboot, and reopen the same contents.",
       "priority": 2,

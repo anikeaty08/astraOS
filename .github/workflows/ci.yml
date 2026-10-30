@@ -40,3 +40,6 @@ jobs:
 
       - name: Standalone editor test
         run: make editor-smoke
+
+      - name: Full-disk save failure test
+        run: make save-failure-smoke

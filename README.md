@@ -10,7 +10,7 @@ The [vision](docs/vision.md), [system architecture](docs/architecture.md), [rese
 - Physical and virtual memory management, ring 3 ELF programs, syscalls, process scheduling and fault isolation.
 - Timer preemption of user programs, background launch/kill, exit/reap, and a basic userspace shell with foreground child execution.
 - A standalone bounded line editor (`/EDIT`) with print, append, insert, delete, save, and discard commands.
-- VFS and FAT16 file operations. A userspace single-line save/replacement survives a normal QEMU guest reboot; power-loss safety is **not verified**.
+- VFS and FAT16 file operations. Userspace replacement writes a temporary file first and preserves the old file on a tested full-disk write failure. Normal QEMU reboot persistence passes; power-loss safety is **not verified**.
 - Device-driver code including ATA, AHCI, NVMe, USB and RTL8139. Presence of a driver does not imply tested hardware support or a working TCP/IP stack.
 
 QEMU integration checks currently cover boot, user fault recovery, preemption, and process-slot reuse. The default interactive shell is still kernel-owned. No supported physical-machine release, userspace desktop, or application-level networking is claimed yet.
@@ -42,9 +42,10 @@ make fault-smoke
 make preemption-smoke
 make persistence-smoke
 make editor-smoke
+make save-failure-smoke
 ```
 
-These checks use QEMU. The persistence and editor checks recreate `disk.img` once, then reboot without recreating it and check exact bytes. The checks do not establish crash-safe file writes or real-hardware support. The [feature tracker](.agent-state/feature-list.json) records acceptance evidence.
+These checks use QEMU. The persistence and editor checks recreate `disk.img` once, then reboot without recreating it and check exact bytes. The full-disk check verifies that an ordinary failed replacement leaves the original intact. The checks do not establish crash-safe file writes or real-hardware support. The [feature tracker](.agent-state/feature-list.json) records acceptance evidence.
 
 ## Repository layout
 

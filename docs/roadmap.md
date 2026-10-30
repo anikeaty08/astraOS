@@ -10,7 +10,7 @@ Status words mean: **verified** has a passing repository/QEMU check; **present**
 
 ## Present but unproven as complete workflows
 
-- FAT16/VFS create, read, write, truncate, unlink and rename primitives; interrupted-write behavior is not yet proven.
+- FAT16/VFS create, read, write, truncate, unlink and rename primitives. A full-disk write failure now preserves the original file through temporary-file replacement; interruption during rename or power loss is not yet proven.
 - A userspace single-line `write` command and `make persistence-smoke` now prove create, replace, and exact readback after a normal QEMU guest reboot. This is narrower than an editor or crash-safe storage.
 - A standalone bounded line editor and `make editor-smoke` prove multi-line editing, discard, and reboot readback. The userspace shell is still not the default session.
 - Basic userspace shell and `/PKG`; the shell now waits for foreground child programs, while default userspace startup and terminal ownership remain incomplete.
@@ -41,7 +41,7 @@ This backlog is a direction, not a promise that all items belong in one release.
 ## Release gates
 
 - Build from clean checkout with pinned dependencies and documented toolchain.
-- Automated boot, fault, preemption, and persistent-file checks pass in CI.
+- Automated boot, fault, preemption, persistent-file, editor, and full-disk save-failure checks pass in CI.
 - Each advertised driver/workflow has a reproducible test and known limitations.
 - Physical-hardware claims identify machine model, firmware, storage, input and display devices.
 - No “durable” or “crash-safe” claim until write-cache flush and interrupted-write evidence exists.
