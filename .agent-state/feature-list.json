@@ -104,6 +104,21 @@
       ]
     },
     {
+      "id": "console-input-ownership",
+      "description": "Only the foreground process can read console input; background readers cannot steal keystrokes.",
+      "priority": 2,
+      "dependencies": ["default-userspace-session"],
+      "acceptance_steps": [
+        "Launch an input-reading app in the foreground and read a line",
+        "Launch it in the background and observe a denied read",
+        "Return input to the shell after the foreground app exits"
+      ],
+      "status": "passing",
+      "evidence": [
+        "2026-10-30: make session-smoke observed INPUT_OK foreground from a foreground child, INPUT_DENIED from a background child, and a responsive recovery shell afterward."
+      ]
+    },
+    {
       "id": "normal-reboot-text-persistence",
       "description": "A userspace command can create or replace a text file and reopen the exact bytes after a normal guest reboot.",
       "priority": 2,

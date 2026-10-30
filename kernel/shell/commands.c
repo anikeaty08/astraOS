@@ -698,6 +698,11 @@ bool shell_launch_user(const char *path, bool background, int *exit_status) {
         kprintf("run: could not detach PID %llu\n", proc->pid);
         background = false;
     }
+    if (!background && !process_foreground_acquire(proc)) {
+        kprintf("run: could not assign console to PID %llu\n", proc->pid);
+        process_kill(proc->pid);
+        return false;
+    }
     kprintf("Started user process %s as PID %llu\n", path, proc->pid);
 
     if (background) {

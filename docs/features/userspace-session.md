@@ -10,7 +10,7 @@ This is a **transitional kernel-owned supervisor**. The initial implementation a
 
 - The shell subsystem owns login, normal-session policy, and the recovery prompt. It reuses one foreground process-launch helper rather than copying ELF loading logic.
 - The process subsystem owns child creation, parent relationship, exit status, and resource cleanup. The session helper passes the authenticated UID/admin state into the launched process.
-- While the kernel waits for `/SH`, it does not read the console. While `/SH` waits for a foreground app such as `/EDIT`, it does not read the console. There is one foreground reader at a time; this is the current console ownership rule, not a full terminal implementation.
+- The process subsystem tracks the foreground console reader. A foreground child receives input and returns it on exit or kill; a background app's console read fails. The kernel waits for `/SH`, and `/SH` waits for a foreground app such as `/EDIT`. This is not a full terminal implementation.
 - A clean shell exit is a deliberate request for recovery mode. A failed launch or three nonzero exits also enters recovery. The recovery shell can run `/SH` manually.
 
 ## Acceptance
@@ -21,6 +21,7 @@ This is a **transitional kernel-owned supervisor**. The initial implementation a
 4. An explicit `exit 1` causes a supervised restart and a new `user$ ` prompt. Repeated failures stop at the recovery prompt.
 5. A temporary copy of the disk missing `/SH` falls back to recovery without hanging; the primary test image keeps its shell.
 6. Existing boot, fault, preemption, persistence, editor, and save-failure tests pass after adapting their prompt expectations.
+7. Foreground `/INPUT` reads a line, while background `/INPUT` is denied and the recovery shell remains responsive.
 
 ## Limits and next work
 

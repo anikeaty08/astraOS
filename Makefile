@@ -49,7 +49,7 @@ KERNEL := iso/kernel.elf
 ISO := astraos.iso
 DISK := disk.img
 USER_BUILD := build/user
-USER_PROGRAMS := sh hello pkg fault spin edit args
+USER_PROGRAMS := sh hello pkg fault spin edit args input
 USER_BINS := $(addprefix $(USER_BUILD)/,$(USER_PROGRAMS))
 USER_CFLAGS := -ffreestanding -fno-stack-protector -fno-pie -fno-pic \
                -mno-red-zone -mno-80387 -mno-mmx -mno-sse -mno-sse2 \
@@ -132,6 +132,7 @@ disk: userspace
 	mcopy -i $(DISK) $(USER_BUILD)/spin ::/SPIN
 	mcopy -i $(DISK) $(USER_BUILD)/edit ::/EDIT
 	mcopy -i $(DISK) $(USER_BUILD)/args ::/ARGS
+	mcopy -i $(DISK) $(USER_BUILD)/input ::/INPUT
 
 # Run in QEMU
 run: iso disk

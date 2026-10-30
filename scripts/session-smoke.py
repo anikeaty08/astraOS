@@ -38,6 +38,12 @@ def main():
         guest.send("run /EDIT a b c d e f g h")
         guest.wait_for("run: at most 8 arguments")
         guest.wait_for("user$ ")
+        guest.send("run /INPUT")
+        guest.wait_for("started pid")
+        guest.send("foreground")
+        guest.wait_for("INPUT_OK foreground")
+        guest.wait_for("process exited 0")
+        guest.wait_for("user$ ")
 
         for attempt in range(1, 4):
             guest.send("exit 1")
@@ -53,6 +59,10 @@ def main():
         guest.wait_for("user$ ")
         guest.send("exit")
         guest.wait_for("exited with status 0")
+        guest.wait_for("$ ")
+        guest.send("run /INPUT &")
+        guest.wait_for("INPUT_DENIED")
+        guest.send("uptime")
         guest.wait_for("$ ")
         guest.close()
         guest = None

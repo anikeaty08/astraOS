@@ -163,4 +163,8 @@ int process_fd_write(struct process *proc, int fd, const uint8_t *buffer, size_t
 int process_fd_close(struct process *proc, int fd);
 void process_set_credentials(struct process *proc, uint32_t uid, bool is_admin);
 
+/* The foreground process is the only user process allowed to read console fd 0. */
+bool process_foreground_acquire(struct process *child);
+bool process_foreground_read_allowed(void);
+
 #endif /* _ASTRA_PROC_PROCESS_H */

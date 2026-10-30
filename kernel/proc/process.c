@@ -20,6 +20,7 @@
 static struct process process_table[MAX_PROCESSES];
 static uint64_t next_pid = 1;
 static struct process *current_process = NULL;
+static struct process *foreground_process = NULL;
 static spinlock_t process_lock = SPINLOCK_INIT;
 
 /*
@@ -47,6 +48,37 @@ void process_init(void) {
     strcpy(idle->name, "kernel");
 
     current_process = idle;
+    foreground_process = idle;
+}
+
+static void foreground_restore_on_exit(struct process *proc) {
+    if (foreground_process != proc) return;
+    struct process *parent = proc->parent;
+    if (parent && parent->state != PROCESS_UNUSED &&
+        parent->state != PROCESS_ZOMBIE) {
+        foreground_process = parent;
+    } else {
+        foreground_process = &process_table[0];
+    }
+}
+
+bool process_foreground_acquire(struct process *child) {
+    uint64_t flags;
+    spinlock_acquire_irqsave(&process_lock, &flags);
+    bool allowed = current_process && child && child->parent == current_process &&
+                   foreground_process == current_process &&
+                   (child->state == PROCESS_READY || child->state == PROCESS_RUNNING);
+    if (allowed) foreground_process = child;
+    spinlock_release_irqrestore(&process_lock, flags);
+    return allowed;
+}
+
+bool process_foreground_read_allowed(void) {
+    uint64_t flags;
+    spinlock_acquire_irqsave(&process_lock, &flags);
+    bool allowed = current_process && current_process == foreground_process;
+    spinlock_release_irqrestore(&process_lock, flags);
+    return allowed;
 }
 
 /*
@@ -532,6 +564,7 @@ static void process_finish_current(int exit_code, bool from_interrupt) {
     spinlock_acquire_irqsave(&process_lock, &flags);
 
     if (current_process && current_process->pid != 0) {
+        foreground_restore_on_exit(current_process);
         for (int i = 1; i < MAX_PROCESSES; i++) {
             if (process_table[i].parent == current_process) {
                 process_table[i].parent = NULL;
@@ -596,6 +629,10 @@ int process_kill_as(uint64_t pid, uint32_t uid, bool is_admin) {
     }
 
     if (proc->state != PROCESS_ZOMBIE) {
+        foreground_restore_on_exit(proc);
+        for (int i = 1; i < MAX_PROCESSES; i++) {
+            if (process_table[i].parent == proc) process_table[i].parent = NULL;
+        }
         proc->exit_code = -1;
         proc->wait_observed = false;
         proc->state = PROCESS_ZOMBIE;
@@ -614,6 +651,11 @@ int process_detach(uint64_t pid) {
 
     struct process *proc = process_get(pid);
     if (!current_process || !proc || proc->parent != current_process) {
+        spinlock_release_irqrestore(&process_lock, flags);
+        return -1;
+    }
+
+    if (proc == foreground_process) {
         spinlock_release_irqrestore(&process_lock, flags);
         return -1;
     }

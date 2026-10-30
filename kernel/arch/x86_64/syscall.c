@@ -90,6 +90,8 @@ static int64_t sys_read(uint64_t fd, char *buf, size_t len) {
         return process_fd_read(current, (int)fd, (uint8_t *)buf, len);
     }
 
+    if (!process_foreground_read_allowed()) return -1;
+
     size_t read = 0;
     while (read < len) {
         char c = kgetc();
@@ -299,6 +301,9 @@ static int64_t spawn_kernel(const char *kernel_path, int argc,
     if (!child) {
         return -1;
     }
+
+    /* A foreground parent hands the console to its new child. */
+    (void)process_foreground_acquire(child);
 
     return (int64_t)child->pid;
 }

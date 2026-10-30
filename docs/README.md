@@ -13,6 +13,7 @@ The documents describe a target, not a claim that every capability already exist
 8. [Default userspace session](features/userspace-session.md) — supervised shell and recovery behavior.
 9. [ATA PIO completion decision](decisions/ata-pio-completion.md) — storage status polling and observed failure.
 10. [Native app arguments](features/app-arguments.md) — launch ABI and initial stack contract.
+11. [Console input ownership](features/console-ownership.md) — foreground handoff and background read denial.
 
 The current implementation evidence lives in [the feature tracker](../.agent-state/feature-list.json).
 Update the relevant document when a decision or contract changes; keep the README short.

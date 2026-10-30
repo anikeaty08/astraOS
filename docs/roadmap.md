@@ -13,7 +13,7 @@ Status words mean: **verified** has a passing repository/QEMU check; **present**
 - FAT16/VFS create, read, write, truncate, unlink and rename primitives. A full-disk write failure now preserves the original file through temporary-file replacement; interruption during rename or power loss is not yet proven.
 - A userspace single-line `write` command and `make persistence-smoke` now prove create, replace, and exact readback after a normal QEMU guest reboot. This is narrower than an editor or crash-safe storage.
 - A standalone bounded line editor and `make editor-smoke` prove multi-line editing, discard, and reboot readback.
-- The userspace shell is the default session after login; `make session-smoke` proves bounded restart, kernel recovery fallback, and app argument delivery. Login/supervision remain kernel-owned, and signals, job control and terminal ownership are still incomplete.
+- The userspace shell is the default session after login; `make session-smoke` proves bounded restart, kernel recovery fallback, app argument delivery, and one foreground console reader. Login/supervision remain kernel-owned; signals and job control are incomplete.
 - `/PKG` is present but not a verified package-management workflow.
 - Framebuffer GUI, input, PCI, disk, USB and raw NIC drivers; named physical-machine support and a full userspace desktop/network service are not proven.
 
@@ -36,7 +36,7 @@ This backlog is a direction, not a promise that all items belong in one release.
 
 ## Next two engineering slices
 
-1. **Userspace session continuation** — add explicit terminal ownership/signals, then a userspace init/service manager. Native app arguments, the default shell, and bounded kernel supervision now pass QEMU checks.
+1. **Userspace session continuation** — add interrupt signals and job control, then a userspace init/service manager. A single foreground console reader, native app arguments, the default shell, and bounded kernel supervision now pass QEMU checks.
 2. **Durability API** — define append and flush semantics at the syscall/VFS/block boundaries, then add interrupted-write tests. This is separate from normal reboot persistence.
 
 ## Release gates
