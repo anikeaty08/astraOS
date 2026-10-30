@@ -1,5 +1,6 @@
 #include "syscall.h"
 #include "shell/file_commands.h"
+#include <limits.h>
 
 static size_t strlen(const char *s) {
     size_t n = 0;
@@ -39,7 +40,9 @@ static int parse_pid(const char *s, long *pid) {
         if (*s < '0' || *s > '9') {
             return -1;
         }
-        value = value * 10 + (*s - '0');
+        int digit = *s - '0';
+        if (value > (LONG_MAX - digit) / 10) return -1;
+        value = value * 10 + digit;
         s++;
     }
 
@@ -52,8 +55,9 @@ static int parse_exit_code(const char *text, int *code) {
     if (!*text) return -1;
     while (*text) {
         if (*text < '0' || *text > '9') return -1;
-        value = value * 10 + (*text - '0');
-        if (value > 255) return -1;
+        int digit = *text - '0';
+        if (value > (255 - digit) / 10) return -1;
+        value = value * 10 + digit;
         text++;
     }
     *code = value;

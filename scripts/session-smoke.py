@@ -3,6 +3,9 @@
 
 import subprocess
 import sys
+import shutil
+import pathlib
+import tempfile
 
 from qemu_guest import Guest
 
@@ -12,6 +15,9 @@ def main():
     try:
         guest = Guest()
         guest.login()
+        guest.send("exit " + "9" * 100)
+        guest.wait_for("expected a code from 0 to 255")
+        guest.wait_for("user$ ")
         guest.send("run /HELLO")
         guest.wait_for("hello from AstraOS ring 3")
         guest.wait_for("process exited 0")
@@ -35,17 +41,24 @@ def main():
         guest.close()
         guest = None
 
-        subprocess.run(["mdel", "-i", "disk.img", "::/SH"], check=True)
-        guest = Guest()
-        guest.wait_for("ASTRAOS_SMOKE_READY")
-        guest.wait_for("Username:")
-        guest.send("tester")
-        guest.wait_for("Password:")
-        guest.send("testpass")
-        guest.wait_for("User shell unavailable; entering kernel recovery shell")
-        guest.wait_for("$ ")
-        guest.send("uptime")
-        guest.wait_for("$ ")
+        with tempfile.TemporaryDirectory() as directory:
+            missing_shell_disk = pathlib.Path(directory) / "missing-shell.img"
+            shutil.copyfile("disk.img", missing_shell_disk)
+            subprocess.run(["mdel", "-i", str(missing_shell_disk), "::/SH"], check=True)
+            guest = Guest(disk_image=str(missing_shell_disk))
+            guest.wait_for("ASTRAOS_SMOKE_READY")
+            guest.wait_for("Username:")
+            guest.send("tester")
+            guest.wait_for("Password:")
+            guest.send("testpass")
+            guest.wait_for("User shell unavailable; entering kernel recovery shell")
+            guest.wait_for("$ ")
+            guest.send("uptime")
+            guest.wait_for("$ ")
+            guest.close()
+            guest = None
+        subprocess.run(["mdir", "-i", "disk.img", "::/SH"], check=True,
+                       stdout=subprocess.DEVNULL)
         print("Session smoke passed: default shell, bounded restart, and recovery fallback")
         return 0
     except (OSError, RuntimeError, TimeoutError, subprocess.CalledProcessError) as error:

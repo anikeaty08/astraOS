@@ -19,7 +19,7 @@ This is a **transitional kernel-owned supervisor**. The initial implementation a
 2. `run /EDIT` from the default shell opens the editor; on exit input returns to `user$ `.
 3. `exit` returns to the kernel `$ ` prompt; kernel recovery commands still work.
 4. An explicit `exit 1` causes a supervised restart and a new `user$ ` prompt. Repeated failures stop at the recovery prompt.
-5. A disk missing `/SH` falls back to recovery without hanging.
+5. A temporary copy of the disk missing `/SH` falls back to recovery without hanging; the primary test image keeps its shell.
 6. Existing boot, fault, preemption, persistence, editor, and save-failure tests pass after adapting their prompt expectations.
 
 ## Limits and next work

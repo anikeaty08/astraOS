@@ -7,10 +7,10 @@ import time
 
 
 class Guest:
-    def __init__(self, timeout_seconds=90):
+    def __init__(self, timeout_seconds=90, disk_image="disk.img"):
         self.process = subprocess.Popen(
             ["qemu-system-x86_64", "-cdrom", "astraos.iso", "-boot", "order=d",
-             "-drive", "file=disk.img,format=raw,if=ide", "-m", "256M",
+             "-drive", f"file={disk_image},format=raw,if=ide", "-m", "256M",
              "-display", "none", "-monitor", "none", "-serial", "stdio",
              "-no-reboot"],
             stdin=subprocess.PIPE, stdout=subprocess.PIPE,

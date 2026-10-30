@@ -85,7 +85,7 @@
       ],
       "status": "passing",
       "evidence": [
-        "2026-10-30: make session-smoke launched /SH after login, ran /HELLO as a foreground child, restarted after exit 1, stopped after three failures, returned to recovery on exit 0, and fell back when /SH was removed from the disk image."
+        "2026-10-30: make session-smoke launched /SH after login, rejected an overflowing exit code, ran /HELLO as a foreground child, restarted after exit 1, stopped after three failures, returned to recovery on exit 0, and fell back when /SH was removed from a temporary disk-image copy."
       ]
     },
     {
