@@ -89,6 +89,21 @@
       ]
     },
     {
+      "id": "native-app-arguments",
+      "description": "A userspace shell can pass a bounded argument vector to native ELF applications.",
+      "priority": 2,
+      "dependencies": ["default-userspace-session"],
+      "acceptance_steps": [
+        "Launch the editor with a path argument without an interactive path prompt",
+        "Pass the maximum eight arguments to an app and reject a ninth",
+        "Keep the legacy one-path spawn and editor prompt working"
+      ],
+      "status": "passing",
+      "evidence": [
+        "2026-10-30: make session-smoke launched /EDIT with /ARGS.TXT, verified /ARGS reported argc=8 and arg7=g, rejected a ninth element, and retained legacy /HELLO launch; make editor-smoke retained the interactive editor path."
+      ]
+    },
+    {
       "id": "normal-reboot-text-persistence",
       "description": "A userspace command can create or replace a text file and reopen the exact bytes after a normal guest reboot.",
       "priority": 2,

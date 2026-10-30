@@ -28,6 +28,7 @@ enum syscall_number {
     SYS_RENAME = 12,
     SYS_TRUNCATE = 13,
     SYS_FSCK = 14,
+    SYS_SPAWNV = 15,
 };
 
 void syscall_init(void);

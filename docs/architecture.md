@@ -39,7 +39,7 @@ The kernel owns privileged hardware access, isolation, scheduling, VM, system-ca
 
 ## Data paths
 
-**Application launch:** shell parses command → spawn syscall validates path → VFS resolves ELF → loader creates private address space → scheduler runs process → exit/fault returns status → process resources are reaped. The kernel shell currently exercises this; userspace init and default shell are a later milestone.
+**Application launch:** userspace shell parses command → spawn syscall copies and validates path and arguments → VFS resolves ELF → loader creates private address space and initial argument stack → scheduler runs process → exit/fault returns status → process resources are reaped. The default userspace shell exercises this; userspace init is a later milestone.
 
 **File save:** editor buffers text in user memory → shared userspace routine creates a unique temporary file → per-process descriptor tracks writes through the VFS/FAT16/block driver → close → old name moves to a backup and temporary name becomes the target → backup is removed only after promotion → reboot remounts the same image → reopen/read compares bytes. On an ordinary promotion error, the routine attempts rollback and reports a backup path if it cannot restore. Normal reboot persistence is proven. Crash consistency is a separate, stricter gate requiring flush semantics and fault injection; FAT16 rename is not a transaction.
 

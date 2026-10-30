@@ -22,6 +22,22 @@ def main():
         guest.wait_for("hello from AstraOS ring 3")
         guest.wait_for("process exited 0")
         guest.wait_for("user$ ")
+        guest.send("run /ARGS a b c d e f g")
+        guest.wait_for("argc=8")
+        guest.wait_for("arg0=/ARGS")
+        guest.wait_for("arg7=g")
+        guest.wait_for("process exited 0")
+        guest.wait_for("user$ ")
+
+        guest.send("run /EDIT /ARGS.TXT")
+        guest.wait_for("new file")
+        guest.wait_for("edit> ")
+        guest.send("q!")
+        guest.wait_for("process exited 0")
+        guest.wait_for("user$ ")
+        guest.send("run /EDIT a b c d e f g h")
+        guest.wait_for("run: at most 8 arguments")
+        guest.wait_for("user$ ")
 
         for attempt in range(1, 4):
             guest.send("exit 1")

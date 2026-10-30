@@ -171,11 +171,29 @@ static void help(void) {
     print_text("w save | q quit if clean | q! discard | h help\n");
 }
 
-int main(void) {
+int main(int argc, char **argv) {
     char command[160];
     edit_document_init(&document);
-    print_text("AstraOS line editor\npath: ");
-    if (read_line(path, sizeof(path)) < 0 || !user_valid_file_path(path)) {
+    print_text("AstraOS line editor\n");
+    if (argc > 2) {
+        print_text("usage: run /EDIT [/NOTE.TXT]\n");
+        return 1;
+    }
+    if (argc == 2) {
+        size_t length = text_length(argv[1]);
+        if (length >= sizeof(path)) {
+            print_text("edit: use a root-level 8.3 path such as /NOTE.TXT\n");
+            return 1;
+        }
+        for (size_t i = 0; i <= length; i++) path[i] = argv[1][i];
+    } else {
+        print_text("path: ");
+        if (read_line(path, sizeof(path)) < 0) {
+            print_text("edit: use a root-level 8.3 path such as /NOTE.TXT\n");
+            return 1;
+        }
+    }
+    if (!user_valid_file_path(path)) {
         print_text("edit: use a root-level 8.3 path such as /NOTE.TXT\n");
         return 1;
     }

@@ -106,6 +106,7 @@ static int copy_user_string(uint64_t user_ptr, char *out, size_t out_size) {
     if (!out || out_size == 0) return -1;
 
     for (size_t i = 0; i < out_size; i++) {
+        if (user_ptr > USER_SPACE_TOP - 1 - i) return -1;
         if (!user_range_valid(user_ptr + i, 1)) {
             return -1;
         }
@@ -249,13 +250,8 @@ static int64_t sys_fsck(uint64_t repair) {
     return vfs_fsck(repair ? VFS_FSCK_REPAIR : 0);
 }
 
-static int64_t sys_spawn(const char *path) {
-    char kernel_path[USER_PATH_MAX];
-
-    if (copy_user_string((uint64_t)path, kernel_path, sizeof(kernel_path)) < 0) {
-        return -1;
-    }
-
+static int64_t spawn_kernel(const char *kernel_path, int argc,
+                            const char *const arguments[]) {
     struct vfs_node *node = vfs_open(kernel_path);
     struct process *current = process_current();
     if (!node || vfs_is_directory(node) ||
@@ -296,7 +292,8 @@ static int64_t sys_spawn(const char *path) {
 
     vfs_close(node);
 
-    struct process *child = process_create_elf(kernel_path, image, (size_t)size);
+    struct process *child = process_create_elf_args(kernel_path, image,
+                                                    (size_t)size, argc, arguments);
     kfree(image);
 
     if (!child) {
@@ -304,6 +301,39 @@ static int64_t sys_spawn(const char *path) {
     }
 
     return (int64_t)child->pid;
+}
+
+static int64_t sys_spawnv(const char *path, uint64_t argc,
+                          const char *const user_argv[]) {
+    char kernel_path[USER_PATH_MAX];
+    if (copy_user_string((uint64_t)path, kernel_path, sizeof(kernel_path)) < 0)
+        return -1;
+    if (argc < 1 || argc > PROCESS_ARG_MAX ||
+        !user_range_valid((uint64_t)user_argv,
+                          (size_t)argc * sizeof(*user_argv))) return -1;
+
+    char argument_bytes[PROCESS_ARG_MAX][PROCESS_ARG_BYTES];
+    const char *arguments[PROCESS_ARG_MAX];
+    size_t total = 0;
+    for (uint64_t i = 0; i < argc; i++) {
+        uint64_t pointer = (uint64_t)user_argv[i];
+        if (total >= PROCESS_ARG_BYTES ||
+            copy_user_string(pointer, argument_bytes[i],
+                             PROCESS_ARG_BYTES - total) < 0) return -1;
+        size_t length = 0;
+        while (argument_bytes[i][length]) length++;
+        total += length + 1;
+        arguments[i] = argument_bytes[i];
+    }
+    return spawn_kernel(kernel_path, (int)argc, arguments);
+}
+
+static int64_t sys_spawn(const char *path) {
+    char kernel_path[USER_PATH_MAX];
+    if (copy_user_string((uint64_t)path, kernel_path, sizeof(kernel_path)) < 0)
+        return -1;
+    const char *argv[] = { kernel_path };
+    return spawn_kernel(kernel_path, 1, argv);
 }
 
 static int64_t sys_wait(uint64_t pid, int *status) {
@@ -390,6 +420,11 @@ void syscall_handler(struct interrupt_frame *frame) {
 
         case SYS_SPAWN:
             result = sys_spawn((const char *)frame->rdi);
+            break;
+
+        case SYS_SPAWNV:
+            result = sys_spawnv((const char *)frame->rdi, frame->rsi,
+                                (const char *const *)frame->rdx);
             break;
 
         case SYS_KILL:

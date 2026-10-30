@@ -24,4 +24,4 @@ This is a **transitional kernel-owned supervisor**. The initial implementation a
 
 ## Limits and next work
 
-The kernel still performs login and owns this supervisor. There are no signals, PTYs, job-control groups, arguments/environment block, service dependency graph, or automatic relaunch after an unkillable kernel fault. `process_wait` currently yields in a loop. Those are explicit later session/runtime tasks; none are implied by the word “session” here.
+The kernel still performs login and owns this supervisor. A bounded argument vector now reaches native apps, but environment variables, signals, PTYs, job-control groups, a service dependency graph, and automatic relaunch after an unkillable kernel fault are absent. `process_wait` currently yields in a loop. Those are explicit later session/runtime tasks; none are implied by the word “session” here.

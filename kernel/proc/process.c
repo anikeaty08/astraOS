@@ -416,7 +416,48 @@ static bool map_elf_segment(pagetable_t address_space,
 /*
  * Create a new isolated ring-3 process from an ELF64 executable image
  */
-struct process *process_create_elf(const char *name, const void *image, size_t size) {
+static bool prepare_user_stack(pagetable_t address_space, int argc,
+                               const char *const argv[], uint64_t *stack_pointer) {
+    if (argc < 1 || argc > PROCESS_ARG_MAX || !argv || !stack_pointer) return false;
+
+    uint64_t top_page = USER_STACK_TOP - PAGE_SIZE;
+    uint64_t phys = vmm_virt_to_phys(address_space, top_page);
+    if (!phys) return false;
+
+    extern uint64_t hhdm_offset;
+    uint8_t *page = (uint8_t *)(phys + hhdm_offset);
+    memset(page, 0, PAGE_SIZE);
+
+    uint64_t pointers[PROCESS_ARG_MAX];
+    size_t used = 0;
+    size_t cursor = PAGE_SIZE;
+    for (int i = argc - 1; i >= 0; i--) {
+        if (!argv[i]) return false;
+        size_t length = strlen(argv[i]) + 1;
+        if (length > PROCESS_ARG_BYTES - used) return false;
+        used += length;
+        cursor -= length;
+        memcpy(page + cursor, argv[i], length);
+        pointers[i] = top_page + cursor;
+    }
+
+    /* argc, argv[], NULL, envp NULL, and an AT_NULL auxiliary entry. */
+    size_t word_count = (size_t)argc + 5;
+    cursor = (cursor - word_count * sizeof(uint64_t)) & ~(size_t)15;
+    uint64_t *words = (uint64_t *)(page + cursor);
+    words[0] = (uint64_t)argc;
+    for (int i = 0; i < argc; i++) words[i + 1] = pointers[i];
+    words[argc + 1] = 0;
+    words[argc + 2] = 0;
+    words[argc + 3] = 0;
+    words[argc + 4] = 0;
+    *stack_pointer = top_page + cursor;
+    return true;
+}
+
+struct process *process_create_elf_args(const char *name, const void *image,
+                                        size_t size, int argc,
+                                        const char *const argv[]) {
     const uint8_t *bytes = (const uint8_t *)image;
     const struct elf64_header *eh = (const struct elf64_header *)image;
 
@@ -462,15 +503,25 @@ struct process *process_create_elf(const char *name, const void *image, size_t s
         }
     }
 
+    uint64_t initial_stack;
+    if (!prepare_user_stack(address_space, argc, argv, &initial_stack)) {
+        vmm_destroy_address_space(address_space);
+        return NULL;
+    }
+
     struct process *proc = process_create_user_space(name, address_space,
-                                                     eh->entry,
-                                                     USER_STACK_TOP);
+                                                     eh->entry, initial_stack);
     if (!proc) {
         vmm_destroy_address_space(address_space);
         return NULL;
     }
 
     return proc;
+}
+
+struct process *process_create_elf(const char *name, const void *image, size_t size) {
+    const char *argv[] = { name ? name : "user" };
+    return process_create_elf_args(name, image, size, 1, argv);
 }
 
 /*

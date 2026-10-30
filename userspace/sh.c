@@ -162,8 +162,27 @@ static void wait_pid(const char *arg) {
     puts("\n");
 }
 
-static void run_program(const char *path) {
-    long pid = sys_spawn(path);
+static void run_program(char *command) {
+    const char *arguments[8];
+    int argc = 0;
+    char *cursor = command;
+    while (*cursor) {
+        while (*cursor == ' ' || *cursor == '\t') cursor++;
+        if (!*cursor) break;
+        if (argc == 8) {
+            puts("run: at most 8 arguments\n");
+            return;
+        }
+        arguments[argc++] = cursor;
+        while (*cursor && *cursor != ' ' && *cursor != '\t') cursor++;
+        if (*cursor) *cursor++ = '\0';
+    }
+    if (!argc) {
+        puts("usage: run /PROGRAM [arguments]\n");
+        return;
+    }
+
+    long pid = sys_spawnv(arguments[0], argc, arguments);
 
     if (pid < 0) {
         puts("run: failed to spawn program\n");
@@ -219,7 +238,7 @@ int main(void) {
         trim_newline(line);
 
         if (strcmp(line, "help") == 0) {
-            puts("commands: help pid echo cat write run kill wait exit [code] yield\n");
+            puts("commands: help pid echo cat write run /PROGRAM [args] kill wait exit [code] yield\n");
         } else if (strcmp(line, "pid") == 0) {
             print_pid();
         } else if (strcmp(line, "yield") == 0) {

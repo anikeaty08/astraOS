@@ -23,6 +23,8 @@
 #define PROCESS_MAX_FILES   16
 #define PROCESS_FD_READ     1
 #define PROCESS_FD_WRITE    2
+#define PROCESS_ARG_MAX     8
+#define PROCESS_ARG_BYTES   512
 
 struct vfs_node;
 
@@ -108,6 +110,9 @@ struct process *process_create_user(const char *name, const void *image, size_t 
 
 /* Create a new isolated ring-3 process from an ELF64 executable image */
 struct process *process_create_elf(const char *name, const void *image, size_t size);
+struct process *process_create_elf_args(const char *name, const void *image,
+                                        size_t size, int argc,
+                                        const char *const argv[]);
 
 /* Exit current process */
 void process_exit(int exit_code);
