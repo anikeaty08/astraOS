@@ -1,5 +1,6 @@
 #include "file_commands.h"
 #include "../syscall.h"
+#include "../runtime/file_replace.h"
 
 static size_t text_length(const char *text) {
     size_t length = 0;
@@ -43,38 +44,34 @@ void user_write_file(char *arg) {
     }
 
     *arg++ = '\0';
-    long fd = sys_create(path);
-    if (fd < 0) {
-        if (sys_truncate(path, 0) < 0) {
-            print_text("write: cannot create or truncate file\n");
-            return;
-        }
-        fd = sys_open_write(path);
-        if (fd < 0) {
-            print_text("write: cannot open file\n");
-            return;
-        }
-    }
-
-    size_t length = text_length(arg);
-    size_t offset = 0;
-    while (offset < length) {
-        long n = sys_write((int)fd, arg + offset, length - offset);
-        if (n <= 0) {
-            print_text("write: save failed\n");
-            sys_close((int)fd);
-            return;
-        }
-        offset += (size_t)n;
-    }
-    if (sys_write((int)fd, "\n", 1) != 1) {
-        print_text("write: save failed\n");
-        sys_close((int)fd);
+    if (!user_valid_file_path(path)) {
+        print_text("write: use a root-level 8.3 path\n");
         return;
     }
-    if (sys_close((int)fd) < 0) {
-        print_text("write: close failed\n");
+    size_t length = text_length(arg);
+    char output[128];
+    if (length + 1 > sizeof(output)) {
+        print_text("write: text too long\n");
+        return;
+    }
+    for (size_t i = 0; i < length; i++) output[i] = arg[i];
+    output[length++] = '\n';
+
+    char recovery_path[16];
+    int result = user_replace_file(path, output, length, recovery_path);
+    if (result < 0) {
+        print_text("write: save failed\n");
+        if (result == USER_REPLACE_RESTORE_FAILED) {
+            print_text("write: recover previous data from ");
+            print_text(recovery_path);
+            print_text("\n");
+        }
         return;
     }
     print_text("saved\n");
+    if (result == USER_REPLACE_BACKUP_LEFT) {
+        print_text("write: old backup remains at ");
+        print_text(recovery_path);
+        print_text("\n");
+    }
 }

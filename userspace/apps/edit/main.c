@@ -1,8 +1,10 @@
 #include "document.h"
 #include "../../syscall.h"
+#include "../../runtime/file_replace.h"
 
 static struct edit_document document;
 static char path[16];
+static char saved_text[EDIT_MAX_LINES * (EDIT_MAX_LINE_LENGTH + 1)];
 
 static size_t text_length(const char *text) {
     size_t length = 0;
@@ -40,28 +42,6 @@ static int read_line(char *buffer, size_t capacity) {
 
     buffer[used] = '\0';
     return overflow ? -1 : 0;
-}
-
-static int valid_path(const char *candidate) {
-    if (candidate[0] != '/' || !candidate[1]) return 0;
-
-    size_t name = 0;
-    size_t extension = 0;
-    int dot = 0;
-    for (size_t i = 1; candidate[i]; i++) {
-        char c = candidate[i];
-        if (c == '.') {
-            if (dot || name == 0) return 0;
-            dot = 1;
-            continue;
-        }
-        if (!((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') ||
-              (c >= '0' && c <= '9') || c == '_' || c == '-')) return 0;
-        if (dot) {
-            if (++extension > 3) return 0;
-        } else if (++name > 8) return 0;
-    }
-    return !dot || extension > 0;
 }
 
 static int load_file(void) {
@@ -127,44 +107,34 @@ static int load_file(void) {
     return 0;
 }
 
-static int write_all(int fd, const char *text, size_t length) {
-    size_t written = 0;
-    while (written < length) {
-        long count = sys_write(fd, text + written, length - written);
-        if (count <= 0) return -1;
-        written += (size_t)count;
-    }
-    return 0;
-}
-
 static int save_file(void) {
-    long fd = sys_create(path);
-    if (fd < 0) {
-        if (sys_truncate(path, 0) < 0) {
-            print_text("edit: cannot create or truncate file\n");
-            return -1;
+    size_t length = 0;
+    for (size_t line = 0; line < document.count; line++) {
+        const char *text = document.lines[line];
+        for (size_t column = 0; text[column]; column++) {
+            saved_text[length++] = text[column];
         }
-        fd = sys_open_write(path);
-        if (fd < 0) {
-            print_text("edit: cannot open file for writing\n");
-            return -1;
-        }
+        saved_text[length++] = '\n';
     }
 
-    for (size_t line = 0; line < document.count; line++) {
-        if (write_all((int)fd, document.lines[line], text_length(document.lines[line])) < 0 ||
-            write_all((int)fd, "\n", 1) < 0) {
-            print_text("edit: write failed; file may be incomplete\n");
-            sys_close((int)fd);
-            return -1;
+    char recovery_path[16];
+    int result = user_replace_file(path, saved_text, length, recovery_path);
+    if (result < 0) {
+        print_text("edit: save failed; original file preserved if present\n");
+        if (result == USER_REPLACE_RESTORE_FAILED) {
+            print_text("edit: recover previous data from ");
+            print_text(recovery_path);
+            print_text("\n");
         }
-    }
-    if (sys_close((int)fd) < 0) {
-        print_text("edit: close failed\n");
         return -1;
     }
     document.dirty = false;
     print_text("saved\n");
+    if (result == USER_REPLACE_BACKUP_LEFT) {
+        print_text("edit: old backup remains at ");
+        print_text(recovery_path);
+        print_text("\n");
+    }
     return 0;
 }
 
@@ -201,7 +171,7 @@ int main(void) {
     char command[160];
     edit_document_init(&document);
     print_text("AstraOS line editor\npath: ");
-    if (read_line(path, sizeof(path)) < 0 || !valid_path(path)) {
+    if (read_line(path, sizeof(path)) < 0 || !user_valid_file_path(path)) {
         print_text("edit: use a root-level 8.3 path such as /NOTE.TXT\n");
         return 1;
     }

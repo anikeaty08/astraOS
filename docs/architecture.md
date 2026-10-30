@@ -41,7 +41,7 @@ The kernel owns privileged hardware access, isolation, scheduling, VM, system-ca
 
 **Application launch:** shell parses command → spawn syscall validates path → VFS resolves ELF → loader creates private address space → scheduler runs process → exit/fault returns status → process resources are reaped. The kernel shell currently exercises this; userspace init and default shell are a later milestone.
 
-**File save:** editor buffers text in user memory → file syscall validates path, buffer, permissions, and length → per-process descriptor tracks offset → VFS dispatches write → FAT16 changes data and metadata → block driver writes sectors → close and reboot → new boot remounts the same image → reopen/read compares bytes. Normal reboot persistence is the first gate. Crash consistency is a separate, stricter gate requiring flush semantics and fault injection.
+**File save:** editor buffers text in user memory → shared userspace routine creates a unique temporary file → per-process descriptor tracks writes through the VFS/FAT16/block driver → close → old name moves to a backup and temporary name becomes the target → backup is removed only after promotion → reboot remounts the same image → reopen/read compares bytes. On an ordinary promotion error, the routine attempts rollback and reports a backup path if it cannot restore. Normal reboot persistence is proven. Crash consistency is a separate, stricter gate requiring flush semantics and fault injection; FAT16 rename is not a transaction.
 
 **Future network request:** app socket call → kernel network API → stack → NIC; inbound frames traverse the reverse path after validation. The existing raw RTL8139 driver is only a starting device boundary, not application networking.
 

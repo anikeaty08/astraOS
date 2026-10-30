@@ -80,11 +80,11 @@ $(USER_BUILD):
 $(USER_BUILD)/crt0.o: userspace/crt0.asm | $(USER_BUILD)
 	$(AS) $(ASFLAGS) $< -o $@
 
-$(USER_BUILD)/sh: userspace/sh.c userspace/shell/file_commands.c userspace/shell/file_commands.h $(USER_BUILD)/crt0.o userspace/linker.ld userspace/syscall.h | $(USER_BUILD)
-	$(CC) $(USER_CFLAGS) $(USER_BUILD)/crt0.o userspace/sh.c userspace/shell/file_commands.c -o $@
+$(USER_BUILD)/sh: userspace/sh.c userspace/shell/file_commands.c userspace/shell/file_commands.h userspace/runtime/file_replace.c userspace/runtime/file_replace.h $(USER_BUILD)/crt0.o userspace/linker.ld userspace/syscall.h | $(USER_BUILD)
+	$(CC) $(USER_CFLAGS) $(USER_BUILD)/crt0.o userspace/sh.c userspace/shell/file_commands.c userspace/runtime/file_replace.c -o $@
 
-$(USER_BUILD)/edit: userspace/apps/edit/main.c userspace/apps/edit/document.c userspace/apps/edit/document.h $(USER_BUILD)/crt0.o userspace/linker.ld userspace/syscall.h | $(USER_BUILD)
-	$(CC) $(USER_CFLAGS) $(USER_BUILD)/crt0.o userspace/apps/edit/main.c userspace/apps/edit/document.c -o $@
+$(USER_BUILD)/edit: userspace/apps/edit/main.c userspace/apps/edit/document.c userspace/apps/edit/document.h userspace/runtime/file_replace.c userspace/runtime/file_replace.h $(USER_BUILD)/crt0.o userspace/linker.ld userspace/syscall.h | $(USER_BUILD)
+	$(CC) $(USER_CFLAGS) $(USER_BUILD)/crt0.o userspace/apps/edit/main.c userspace/apps/edit/document.c userspace/runtime/file_replace.c -o $@
 
 $(USER_BUILD)/%: userspace/%.c $(USER_BUILD)/crt0.o userspace/linker.ld userspace/syscall.h | $(USER_BUILD)
 	$(CC) $(USER_CFLAGS) $(USER_BUILD)/crt0.o $< -o $@

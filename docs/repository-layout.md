@@ -15,7 +15,8 @@ kernel/
   shell/         Recovery shell and login
 userspace/
   sh.c           Userspace shell loop and command dispatch
-  shell/         Shell command modules (file commands first)
+  shell/         Shell command modules
+  runtime/       Shared user file replacement; later CRT/libc helpers
   syscall.h      Current native syscall wrapper
   *.c            Other independent ELF programs
 scripts/         QEMU integration checks
@@ -43,7 +44,7 @@ scripts/         Build/image and integration-test tooling
 docs/            Architecture, decision records and feature contracts
 ```
 
-The target is a module ownership guide, not an instruction to create empty directories. New code goes in the relevant home when its interface is designed. Existing kernel files move only when tests can verify the refactor. The current `userspace/shell/file_commands.c` is the first small extraction; `userspace/sh.c` remains the program entry and dispatch.
+The target is a module ownership guide, not an instruction to create empty directories. New code goes in the relevant home when its interface is designed. Existing kernel files move only when tests can verify the refactor. `userspace/shell/file_commands.c` handles shell file commands, `userspace/runtime/file_replace.c` handles shared replacement, and `userspace/sh.c` remains the shell entry and dispatch.
 
 ## Module rules
 
