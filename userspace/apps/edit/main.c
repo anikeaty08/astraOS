@@ -120,11 +120,15 @@ static int save_file(void) {
     char recovery_path[16];
     int result = user_replace_file(path, saved_text, length, recovery_path);
     if (result < 0) {
-        print_text("edit: save failed; original file preserved if present\n");
+        print_text("edit: save failed (code ");
+        print_number((size_t)-result);
+        print_text(")\n");
         if (result == USER_REPLACE_RESTORE_FAILED) {
             print_text("edit: recover previous data from ");
             print_text(recovery_path);
             print_text("\n");
+        } else {
+            print_text("edit: original file preserved if present\n");
         }
         return -1;
     }

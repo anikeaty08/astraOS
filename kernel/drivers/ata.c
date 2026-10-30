@@ -2,8 +2,7 @@
  * AstraOS - ATA Disk Driver Implementation
  * PIO mode ATA driver
  *
- * The filesystem layer remains read-only. Write support here is limited
- * to conservative raw-sector ATA PIO groundwork.
+ * The FAT16 filesystem uses this PIO path for its disk image.
  */
 
 #include "ata.h"
@@ -12,6 +11,10 @@
 #include "../arch/x86_64/io.h"
 #include "../lib/string.h"
 #include "../lib/stdio.h"
+#include "pit.h"
+
+#define ATA_WAIT_TIMEOUT_TICKS 2000  /* PIT runs at 1000 Hz before ATA init. */
+#define ATA_WAIT_POLL_LIMIT 100000000U
 
 /*
  * Drive information storage
@@ -22,18 +25,18 @@ static struct ata_drive drives[4];
  * Wait for drive to be ready (not busy)
  */
 static bool ata_wait_ready(uint16_t base_port) {
-    int timeout = 100000;
+    uint64_t start = pit_get_ticks();
 
-    while (timeout--) {
+    for (uint32_t polls = 0; polls < ATA_WAIT_POLL_LIMIT; polls++) {
         uint8_t status = inb(base_port + 7);
 
-        if (status & ATA_STATUS_ERR) {
-            return false;
+        if (!(status & ATA_STATUS_BSY)) {
+            if (status & (ATA_STATUS_ERR | ATA_STATUS_DF)) return false;
+            if ((status & ATA_STATUS_RDY) && !(status & ATA_STATUS_DRQ))
+                return true;
         }
-
-        if (!(status & ATA_STATUS_BSY) && (status & ATA_STATUS_RDY)) {
-            return true;
-        }
+        if (pit_get_ticks() - start >= ATA_WAIT_TIMEOUT_TICKS) return false;
+        __asm__ volatile ("pause");
     }
 
     return false;
@@ -43,18 +46,17 @@ static bool ata_wait_ready(uint16_t base_port) {
  * Wait for data request ready
  */
 static bool ata_wait_drq(uint16_t base_port) {
-    int timeout = 100000;
+    uint64_t start = pit_get_ticks();
 
-    while (timeout--) {
+    for (uint32_t polls = 0; polls < ATA_WAIT_POLL_LIMIT; polls++) {
         uint8_t status = inb(base_port + 7);
 
-        if (status & ATA_STATUS_ERR) {
-            return false;
+        if (!(status & ATA_STATUS_BSY)) {
+            if (status & (ATA_STATUS_ERR | ATA_STATUS_DF)) return false;
+            if (status & ATA_STATUS_DRQ) return true;
         }
-
-        if (status & ATA_STATUS_DRQ) {
-            return true;
-        }
+        if (pit_get_ticks() - start >= ATA_WAIT_TIMEOUT_TICKS) return false;
+        __asm__ volatile ("pause");
     }
 
     return false;
