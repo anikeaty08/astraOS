@@ -1,0 +1,139 @@
+{
+  "features": [
+    {
+      "id": "user-fault-isolation",
+      "description": "A faulty userspace program exits without stopping the kernel or another program.",
+      "priority": 1,
+      "dependencies": [],
+      "acceptance_steps": [
+        "Launch a program that deliberately faults in ring 3",
+        "Observe a nonzero exit status and no kernel panic",
+        "Launch another userspace program successfully afterward"
+      ],
+      "status": "passing",
+      "evidence": [
+        "2026-10-30: make fault-smoke booted the guest, logged in over serial, observed USER PROCESS FAULT pid=1 vector=6 and exit status -7, then observed /HELLO output and exit status 0."
+      ]
+    },
+    {
+      "id": "preemptive-user-scheduling",
+      "description": "A CPU-bound user program cannot prevent the kernel shell or another runnable process from making progress.",
+      "priority": 1,
+      "dependencies": ["user-fault-isolation"],
+      "acceptance_steps": [
+        "Launch a user program that loops without syscalls or yields",
+        "Observe the shell remain responsive and run another command",
+        "Terminate the looping program and run a new userspace program successfully"
+      ],
+      "status": "passing",
+      "evidence": [
+        "2026-10-30: make preemption-smoke launched two CPU-bound /SPIN programs; both printed SPIN_READY, kernel shell answered uptime, and both were terminated by PID."
+      ]
+    },
+    {
+      "id": "background-jobs",
+      "description": "A user can start a background program, keep using the shell, and terminate the job by PID.",
+      "priority": 1,
+      "dependencies": ["preemptive-user-scheduling"],
+      "acceptance_steps": [
+        "Run a long-lived userspace program with &",
+        "Run another shell command while it is active",
+        "Terminate it with kill and verify later programs still run"
+      ],
+      "status": "passing",
+      "evidence": [
+        "2026-10-30: make preemption-smoke used run /SPIN & twice, executed uptime while both were active, and killed both jobs by distinct PID."
+      ]
+    },
+    {
+      "id": "process-lifecycle",
+      "description": "User programs can start, wait, exit, and be reaped without hangs or resource leaks.",
+      "priority": 1,
+      "dependencies": ["user-fault-isolation"],
+      "acceptance_steps": [
+        "Launch and wait for multiple programs, including a failed program",
+        "Verify the shell remains responsive and process slots are reusable"
+      ],
+      "status": "passing",
+      "evidence": [
+        "2026-10-30: make fault-smoke observed failed child exit -7 and healthy child exit 0; make preemption-smoke launched 70 further /HELLO children, all exited 0, exceeding the 63 non-idle slots."
+      ]
+    },
+    {
+      "id": "userland-shell",
+      "description": "Normal interaction runs in userspace, with the kernel shell available for recovery.",
+      "priority": 2,
+      "dependencies": ["process-lifecycle"],
+      "acceptance_steps": [
+        "Boot into a userspace shell",
+        "Run, interrupt, and exit user programs without losing input or output"
+      ],
+      "status": "pending",
+      "evidence": []
+    },
+    {
+      "id": "persistent-files",
+      "description": "A user can edit a file, reboot, and reopen the same contents.",
+      "priority": 2,
+      "dependencies": ["process-lifecycle"],
+      "acceptance_steps": [
+        "Create and edit a file through a userspace application",
+        "Reboot normally and verify exact contents",
+        "Exercise interrupted and invalid writes without corrupting unrelated files"
+      ],
+      "status": "pending",
+      "evidence": []
+    },
+    {
+      "id": "text-editor",
+      "description": "A userspace editor can open, modify, and save text files.",
+      "priority": 3,
+      "dependencies": ["userland-shell", "persistent-files"],
+      "acceptance_steps": [
+        "Open a file, change text, save, and exit",
+        "Reopen the file after reboot and verify changes"
+      ],
+      "status": "pending",
+      "evidence": []
+    },
+    {
+      "id": "real-hardware-boot",
+      "description": "A documented UEFI x86_64 machine can boot, accept input, access storage, and shut down.",
+      "priority": 3,
+      "dependencies": ["userland-shell", "persistent-files"],
+      "acceptance_steps": [
+        "Boot on a named physical machine from install media",
+        "Exercise input, storage, application launch, and shutdown",
+        "Record supported devices and known limitations"
+      ],
+      "status": "pending",
+      "evidence": []
+    },
+    {
+      "id": "networking",
+      "description": "An application can communicate over a documented network interface and protocol.",
+      "priority": 4,
+      "dependencies": ["process-lifecycle"],
+      "acceptance_steps": [
+        "Configure a supported network device",
+        "Send and receive application data across a network",
+        "Recover from a disconnected or malformed peer"
+      ],
+      "status": "pending",
+      "evidence": []
+    },
+    {
+      "id": "desktop",
+      "description": "A userspace desktop provides reliable input, windows, and application switching.",
+      "priority": 4,
+      "dependencies": ["userland-shell"],
+      "acceptance_steps": [
+        "Launch and switch between two applications",
+        "Use keyboard and pointer input without freezing the desktop",
+        "Recover the desktop after an application fault"
+      ],
+      "status": "pending",
+      "evidence": []
+    }
+  ]
+}

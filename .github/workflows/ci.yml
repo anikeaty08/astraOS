@@ -28,3 +28,9 @@ jobs:
 
       - name: Smoke test
         run: sh scripts/smoke.sh
+
+      - name: User fault isolation test
+        run: make fault-smoke
+
+      - name: Preemption and process reuse test
+        run: make preemption-smoke

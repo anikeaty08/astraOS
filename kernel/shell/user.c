@@ -266,7 +266,6 @@ static bool user_add_persistent_record(char *line) {
     char *active = next_user_field(&cursor);
     char *created = next_user_field(&cursor);
     char *last_login = next_user_field(&cursor);
-    bool has_uid = true;
     uint64_t parsed_uid = 0;
     bool is_admin = false;
     bool is_active = false;
@@ -278,7 +277,6 @@ static bool user_add_persistent_record(char *line) {
     }
 
     if (!last_login) {
-        has_uid = false;
         last_login = created;
         created = active;
         active = admin;

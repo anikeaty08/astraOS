@@ -23,11 +23,12 @@ void scheduler_add(struct process *proc);
  */
 void scheduler_remove(struct process *proc);
 
-/*
- * Main scheduling function
- * Called from non-IRQ context only!
- */
+/* Main scheduling function; reaps exited processes outside interrupt context. */
 void schedule(void);
+
+/* Switch from an interrupt or exception after hardware acknowledgement.
+ * Does not reap processes or perform other deferred cleanup. */
+void schedule_from_interrupt(void);
 
 /*
  * Timer tick handler

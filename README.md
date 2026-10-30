@@ -2,6 +2,14 @@
 
 A hobby x86_64 operating system written in C from scratch.
 
+**Project direction:** AstraOS is growing toward a small, usable independent
+operating system: isolated user programs, reliable files, a userspace shell and
+applications, and documented real-hardware support. See
+[the product contract](.agent-state/product-spec.md) for the current milestones.
+The kernel is still experimental; the supported boot and user-program paths
+are checked in QEMU, while physical hardware and persistent-data reliability
+remain to be validated.
+
 ![Architecture](https://img.shields.io/badge/arch-x86__64-blue)
 ![Language](https://img.shields.io/badge/lang-C-orange)
 ![Bootloader](https://img.shields.io/badge/boot-Limine-purple)
@@ -25,7 +33,8 @@ A hobby x86_64 operating system written in C from scratch.
 
 ### Process Management
 - **Process Control Blocks** - PID, state, kernel stack
-- **Round-Robin Scheduler** - Preemptive multitasking
+- **Round-Robin Scheduler** - Timer preemption for user-mode code; kernel-mode
+  work is scheduled at safe points
 - **Context Switching** - Full register save/restore
 - **Ring 3 User Mode** - Isolated user address spaces and syscall entry
 - **ELF64 Loader** - Loads user-space ELF executables from VFS
@@ -40,7 +49,8 @@ A hobby x86_64 operating system written in C from scratch.
 
 ### File System
 - **VFS Layer** - Abstract file operations
-- **FAT16** - Read-only filesystem support
+- **FAT16** - Read/write support under development; interrupted-write recovery
+  is not yet proven
 
 ### Shell
 Built-in commands:
@@ -121,6 +131,7 @@ os/
 - mtools
 - QEMU
 - Git
+- Python 3 (for the user-fault integration test)
 
 ### On Linux/WSL
 
@@ -148,6 +159,9 @@ make run
 | `make disk` | Create FAT16 disk image containing user programs |
 | `make run` | Run in QEMU |
 | `make run-debug` | Run with interrupt debugging |
+| `make smoke` | Clean build and check boot reaches kernel initialization |
+| `make fault-smoke` | Boot, isolate a faulty userspace program, then run another |
+| `make preemption-smoke` | Check two busy user programs, shell responsiveness, and process reuse |
 | `make clean` | Remove build artifacts |
 
 ---
@@ -191,7 +205,8 @@ run /HELLO
 2. **Spinlock Protection** - All shared data structures protected
 3. **Timer Safety** - Timer ISR only sets flags, no heavy logic
 4. **Architecture Separation** - All x86 code in `arch/x86_64/`
-5. **Read-Only Filesystem** - FAT16 is read-only to prevent corruption
+5. **Storage integrity** - FAT16 write and repair paths need further
+   power-loss and corruption testing before files are considered durable
 
 ---
 

@@ -109,8 +109,17 @@ struct process *process_create_elf(const char *name, const void *image, size_t s
 /* Exit current process */
 void process_exit(int exit_code);
 
+/* Exit after a user exception without doing cleanup on the interrupt stack. */
+void process_exit_from_exception(int exit_code);
+
 /* Terminate a process by PID without signals */
 int process_kill(uint64_t pid);
+
+/* Terminate using explicit caller credentials (for the kernel shell). */
+int process_kill_as(uint64_t pid, uint32_t uid, bool is_admin);
+
+/* Release the current process's wait ownership of a child. */
+int process_detach(uint64_t pid);
 
 /* Collect exit status for a zombie child */
 int process_wait(uint64_t pid, int *status);

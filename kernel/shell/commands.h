@@ -33,6 +33,7 @@ void cmd_mv(int argc, char **argv);
 void cmd_truncate(int argc, char **argv);
 void cmd_fsck(int argc, char **argv);
 void cmd_run(int argc, char **argv);
+void cmd_kill(int argc, char **argv);
 void cmd_ps(int argc, char **argv);
 void cmd_whoami(int argc, char **argv);
 void cmd_users(int argc, char **argv);

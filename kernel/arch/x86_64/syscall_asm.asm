@@ -13,9 +13,12 @@ extern syscall_handler
 
 global syscall_stub
 syscall_stub:
+    ; AX is used to load segment selectors, so preserve the syscall number.
+    push rax
     mov ax, GDT_KERNEL_DATA
     mov ds, ax
     mov es, ax
+    pop rax
 
     ; Match struct interrupt_frame layout used by C handlers.
     push qword 0x0
@@ -61,9 +64,12 @@ syscall_stub:
 
     add rsp, 16
 
+    ; Preserve the syscall return value while restoring user data selectors.
+    push rax
     mov ax, GDT_USER_DATA | USER_RPL
     mov ds, ax
     mov es, ax
+    pop rax
 
     iretq
 

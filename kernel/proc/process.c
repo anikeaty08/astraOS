@@ -11,6 +11,8 @@
 #include "../lib/string.h"
 #include "../sync/spinlock.h"
 #include "../fs/vfs.h"
+#include "../panic.h"
+#include "../arch/x86_64/cpu.h"
 
 /*
  * Process table
@@ -64,6 +66,9 @@ static struct process *find_free_slot(void) {
  * Calls the actual entry point and handles exit
  */
 static void process_entry_wrapper(void) {
+    /* New contexts begin with interrupts disabled until their stack is live. */
+    cpu_sti();
+
     /* Entry point is stored in r12 by process_create */
     void (*entry)(void);
     __asm__ volatile ("mov %%r12, %0" : "=r"(entry));
@@ -471,7 +476,7 @@ struct process *process_create_elf(const char *name, const void *image, size_t s
 /*
  * Exit current process
  */
-void process_exit(int exit_code) {
+static void process_finish_current(int exit_code, bool from_interrupt) {
     uint64_t flags;
     spinlock_acquire_irqsave(&process_lock, &flags);
 
@@ -489,24 +494,33 @@ void process_exit(int exit_code) {
 
     spinlock_release_irqrestore(&process_lock, flags);
 
-    /* Schedule next process */
-    schedule();
-
-    /* Should never reach here */
-    for (;;) {
-        __asm__ volatile ("hlt");
+    /* Exception handlers must leave cleanup to a later non-IRQ switch. */
+    if (from_interrupt) {
+        schedule_from_interrupt();
+    } else {
+        schedule();
     }
+
+    panic("No runnable process after exit");
+}
+
+void process_exit(int exit_code) {
+    process_finish_current(exit_code, false);
+}
+
+void process_exit_from_exception(int exit_code) {
+    process_finish_current(exit_code, true);
 }
 
 int process_kill(uint64_t pid) {
+    struct process *current = process_current();
+    if (!current) return -1;
+    return process_kill_as(pid, current->uid, current->is_admin);
+}
+
+int process_kill_as(uint64_t pid, uint32_t uid, bool is_admin) {
     if (pid == 0) {
         return -1;
-    }
-
-    struct process *current = process_current();
-    if (current && current->pid == pid) {
-        process_exit(-1);
-        return 0;
     }
 
     uint64_t flags;
@@ -518,6 +532,18 @@ int process_kill(uint64_t pid) {
         return -1;
     }
 
+    if (!is_admin &&
+        (proc->uid != uid || proc->is_admin ||
+         proc->page_table == vmm_get_kernel_pml4())) {
+        spinlock_release_irqrestore(&process_lock, flags);
+        return -1;
+    }
+
+    if (proc == current_process) {
+        spinlock_release_irqrestore(&process_lock, flags);
+        process_exit(-1);
+    }
+
     if (proc->state != PROCESS_ZOMBIE) {
         proc->exit_code = -1;
         proc->wait_observed = false;
@@ -525,6 +551,23 @@ int process_kill(uint64_t pid) {
         scheduler_remove(proc);
     }
 
+    spinlock_release_irqrestore(&process_lock, flags);
+    return 0;
+}
+
+int process_detach(uint64_t pid) {
+    if (pid == 0) return -1;
+
+    uint64_t flags;
+    spinlock_acquire_irqsave(&process_lock, &flags);
+
+    struct process *proc = process_get(pid);
+    if (!current_process || !proc || proc->parent != current_process) {
+        spinlock_release_irqrestore(&process_lock, flags);
+        return -1;
+    }
+
+    proc->parent = NULL;
     spinlock_release_irqrestore(&process_lock, flags);
     return 0;
 }

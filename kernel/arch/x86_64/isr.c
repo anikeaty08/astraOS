@@ -9,7 +9,11 @@
 #include "cpu.h"
 #include "../../panic.h"
 #include "../../drivers/serial.h"
+#include "../../drivers/pit.h"
 #include "../../lib/string.h"
+#include "../../lib/stdio.h"
+#include "../../proc/process.h"
+#include "../../proc/scheduler.h"
 
 /*
  * Exception names for debugging
@@ -68,6 +72,23 @@ static void print_hex(uint64_t value) {
  * Handle CPU exception
  */
 static void handle_exception(struct interrupt_frame *frame) {
+    struct process *current = process_current();
+
+    /* A fault in ring 3 belongs to the user process, unless it signals a
+     * machine-level failure. Never return through the faulting IRET frame. */
+    if ((frame->cs & 3) == 3 && current && current->pid != 0 &&
+        frame->int_no != EXCEPTION_NMI && frame->int_no != EXCEPTION_DF &&
+        frame->int_no != EXCEPTION_MC && frame->int_no != EXCEPTION_VC &&
+        frame->int_no != EXCEPTION_SX) {
+        char message[96];
+        ksnprintf(message, sizeof(message),
+                  "USER PROCESS FAULT pid=%llu vector=%llu\n",
+                  current->pid, frame->int_no);
+        serial_puts(message);
+        process_exit_from_exception(-1 - (int)frame->int_no);
+        panic("Returned from a terminated user process");
+    }
+
     serial_puts("\n!!! CPU EXCEPTION !!!\n");
     serial_puts("Exception: ");
     serial_puts(exception_names[frame->int_no]);
@@ -162,6 +183,16 @@ void isr_handler(struct interrupt_frame *frame) {
 
         /* Send EOI */
         irq_eoi(irq);
+
+        /* The saved frame and register image stay on this process's kernel
+         * stack. On resumption, the ISR epilogue restores them and IRETQ
+         * returns to ring 3. Kernel-mode IRQs stay on their current stack. */
+        if (irq == IRQ_TIMER && (frame->cs & 3) == 3 && scheduler_tick()) {
+            /* This tick is handled here; do not make the kernel shell
+             * immediately yield back on the same deferred PIT flag. */
+            pit_clear_reschedule();
+            schedule_from_interrupt();
+        }
     } else {
         /* Other interrupt - just acknowledge */
         serial_puts("Unhandled interrupt: ");

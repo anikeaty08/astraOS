@@ -13,6 +13,7 @@
 #include "../drivers/keyboard.h"
 #include "../drivers/pit.h"
 #include "../drivers/boot_animation.h"
+#include "../proc/scheduler.h"
 
 /*
  * Command buffer
@@ -119,6 +120,8 @@ void shell_execute(const char *line) {
         cmd_fsck(argc, argv);
     } else if (strcmp(cmd, "run") == 0) {
         cmd_run(argc, argv);
+    } else if (strcmp(cmd, "kill") == 0) {
+        cmd_kill(argc, argv);
     } else if (strcmp(cmd, "ps") == 0) {
         cmd_ps(argc, argv);
     } else if (strcmp(cmd, "whoami") == 0) {
@@ -197,10 +200,10 @@ void shell_run(void) {
     cmd_buffer[0] = '\0';
 
     while (1) {
-        /* Check for rescheduling (cooperative multitasking point) */
+        /* Dispatch ready processes outside interrupt context. */
         if (pit_check_reschedule()) {
             pit_clear_reschedule();
-            /* Would call schedule() here if we had processes */
+            schedule();
         }
 
         /* Get character from available input sources */

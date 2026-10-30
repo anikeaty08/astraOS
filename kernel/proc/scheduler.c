@@ -2,8 +2,8 @@
  * AstraOS - Scheduler Implementation
  * Simple round-robin scheduler
  *
- * IMPORTANT: schedule() is called from non-IRQ context only!
- * Timer IRQ only sets a flag, actual scheduling happens here.
+ * Normal scheduling reaps exited processes. Interrupt scheduling preserves
+ * the interrupted stack frame and skips deferred cleanup.
  */
 
 #include "scheduler.h"
@@ -161,13 +161,8 @@ static struct process *ready_queue_pop(void) {
     return NULL;
 }
 
-/*
- * Main scheduling function
- * Called from non-IRQ context only!
- */
-void schedule(void) {
-    process_reap_zombies();
-
+/* Pick and switch without freeing resources on the interrupt stack. */
+static void schedule_switch(void) {
     uint64_t flags;
     spinlock_acquire_irqsave(&sched_lock, &flags);
 
@@ -181,6 +176,9 @@ void schedule(void) {
 
     /* If no ready process, keep running the current context. */
     if (!next) {
+        if (current && current->state == PROCESS_RUNNING) {
+            current->time_slice = DEFAULT_TIME_SLICE;
+        }
         spinlock_release_irqrestore(&sched_lock, flags);
         return;
     }
@@ -209,13 +207,28 @@ void schedule(void) {
 
     /* Perform context switch */
     if (current) {
-        spinlock_release_irqrestore(&sched_lock, flags);
+        /* Keep IRQs disabled until the new stack is active. The suspended
+         * process restores its own saved flags when it resumes here. */
+        spinlock_release(&sched_lock);
         context_switch(&current->context, &next->context);
     } else {
-        spinlock_release_irqrestore(&sched_lock, flags);
+        spinlock_release(&sched_lock);
         /* First switch, just load new context */
         context_switch(NULL, &next->context);
     }
+
+    /* A saved context can resume here after an interrupt gate entered with
+     * IF cleared. Restore this process's original interrupt state. */
+    cpu_restore_flags(flags);
+}
+
+void schedule(void) {
+    process_reap_zombies();
+    schedule_switch();
+}
+
+void schedule_from_interrupt(void) {
+    schedule_switch();
 }
 
 /*

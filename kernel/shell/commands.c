@@ -88,7 +88,8 @@ void cmd_help(int argc, char **argv) {
     kprintf("  %smv%s        - Rename or move a file\n", theme->accent2, ANSI_RESET);
     kprintf("  %struncate%s  - Resize a file\n", theme->accent2, ANSI_RESET);
     kprintf("  %sfsck%s      - Check or repair FAT metadata\n", theme->accent2, ANSI_RESET);
-    kprintf("  %srun%s       - Run ELF64 or flat user binary\n", theme->accent2, ANSI_RESET);
+    kprintf("  %srun%s       - Run a program (add & for background)\n", theme->accent2, ANSI_RESET);
+    kprintf("  %skill%s      - Terminate a process by PID\n", theme->accent2, ANSI_RESET);
     
     kprintf("\n%sCustomization:%s\n", theme->info, ANSI_RESET);
     kprintf("  %stheme%s     - Change color theme\n", theme->accent2, ANSI_RESET);
@@ -632,8 +633,9 @@ void cmd_fsck(int argc, char **argv) {
  * run - Start a ring-3 user binary from the filesystem
  */
 void cmd_run(int argc, char **argv) {
-    if (argc < 2) {
-        kprintf("Usage: run <binary>\n");
+    bool background = argc == 3 && strcmp(argv[2], "&") == 0;
+    if (argc < 2 || (argc != 2 && !background)) {
+        kprintf("Usage: run <binary> [&]\n");
         return;
     }
 
@@ -698,7 +700,38 @@ void cmd_run(int argc, char **argv) {
     }
 
     process_set_credentials(proc, user_get_current_uid(), user_is_admin());
+    if (background && process_detach(proc->pid) < 0) {
+        kprintf("run: could not detach PID %llu\n", proc->pid);
+        background = false;
+    }
     kprintf("Started user process %s as PID %llu\n", argv[1], proc->pid);
+
+    if (background) {
+        return;
+    }
+
+    int status;
+    if (process_wait(proc->pid, &status) < 0) {
+        kprintf("run: could not wait for PID %llu\n", proc->pid);
+        return;
+    }
+
+    kprintf("Process %llu exited with status %d\n", proc->pid, status);
+}
+
+void cmd_kill(int argc, char **argv) {
+    uint64_t pid;
+    if (argc != 2 || !parse_u64_arg(argv[1], &pid) || pid == 0) {
+        kprintf("Usage: kill <pid>\n");
+        return;
+    }
+
+    if (process_kill_as(pid, user_get_current_uid(), user_is_admin()) < 0) {
+        kprintf("kill: PID %llu not found or permission denied\n", pid);
+        return;
+    }
+
+    kprintf("Killed process %llu\n", pid);
 }
 
 /*
