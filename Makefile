@@ -51,6 +51,10 @@ DISK := disk.img
 USER_BUILD := build/user
 USER_PROGRAMS := sh hello pkg fault spin
 USER_BINS := $(addprefix $(USER_BUILD)/,$(USER_PROGRAMS))
+USER_CFLAGS := -ffreestanding -fno-stack-protector -fno-pie -fno-pic \
+               -mno-red-zone -mno-80387 -mno-mmx -mno-sse -mno-sse2 \
+               -nostdlib -static -O2 -Wall -Wextra -Werror \
+               -std=gnu11 -Iuserspace -T userspace/linker.ld
 
 # Limine bootloader path (adjust after cloning)
 LIMINE_DIR := limine
@@ -76,12 +80,11 @@ $(USER_BUILD):
 $(USER_BUILD)/crt0.o: userspace/crt0.asm | $(USER_BUILD)
 	$(AS) $(ASFLAGS) $< -o $@
 
+$(USER_BUILD)/sh: userspace/sh.c userspace/shell/file_commands.c userspace/shell/file_commands.h $(USER_BUILD)/crt0.o userspace/linker.ld userspace/syscall.h | $(USER_BUILD)
+	$(CC) $(USER_CFLAGS) $(USER_BUILD)/crt0.o userspace/sh.c userspace/shell/file_commands.c -o $@
+
 $(USER_BUILD)/%: userspace/%.c $(USER_BUILD)/crt0.o userspace/linker.ld userspace/syscall.h | $(USER_BUILD)
-	$(CC) -ffreestanding -fno-stack-protector -fno-pie -fno-pic \
-		-mno-red-zone -mno-80387 -mno-mmx -mno-sse -mno-sse2 \
-		-nostdlib -static -O2 -Wall -Wextra -Werror \
-		-std=gnu11 -Iuserspace -T userspace/linker.ld \
-		$(USER_BUILD)/crt0.o $< -o $@
+	$(CC) $(USER_CFLAGS) $(USER_BUILD)/crt0.o $< -o $@
 
 userspace: $(USER_BINS)
 

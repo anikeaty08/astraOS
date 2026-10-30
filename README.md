@@ -2,7 +2,7 @@
 
 AstraOS is an experimental x86_64 operating system written primarily in C. The goal is a small, independent **usable personal OS**: boot, run isolated applications, create and keep files, connect to a network, and eventually use a restartable desktop on documented UEFI machines.
 
-The [vision](docs/vision.md), [system architecture](docs/architecture.md), [researched technology decisions](docs/decisions.md), and [feature roadmap](docs/roadmap.md) describe the full direction in focused documents. The [design index](docs/README.md) links the parts. The first active slice is the [persistent text workflow](docs/features/persistent-text.md).
+The [vision](docs/vision.md), [system architecture](docs/architecture.md), [researched technology decisions](docs/decisions.md), and [feature roadmap](docs/roadmap.md) describe the full direction in focused documents. The [design index](docs/README.md) links the parts, including the [repository layout](docs/repository-layout.md). The first active slice is the [persistent text workflow](docs/features/persistent-text.md).
 
 ## What works today
 
